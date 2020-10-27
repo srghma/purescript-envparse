@@ -17,6 +17,7 @@ import Data.Newtype (unwrap)
 import Data.String as String
 import Data.String.Pattern (Pattern(..))
 import Env.Internal.Error as Error
+import Env.Internal.Free (Alt)
 import Env.Internal.Free as Free
 
 helpInfo :: forall e a . Info e -> Parser e a -> Array (Tuple String e) -> String
@@ -35,7 +36,7 @@ helpDoc p =
 
 helpParserDoc :: forall e a . Parser e a -> Array String
 helpParserDoc =
-  join <<< Array.fromFoldable <<< Map.values <<< Free.foldMonoidFreeAlternative go <<< unwrap
+  join <<< Array.fromFoldable <<< Map.values <<< Free.foldAlt go <<< unwrap
   where
     go :: forall a' . VarF e a' -> Map String (Array String)
     go (VarF v) = Map.singleton v.name (helpVarfDoc (VarF v))
@@ -63,28 +64,28 @@ helpVarfDoc (VarF varF) =
                         Just { head, tail } -> Array.cons ((indent 2 varF.name) <> head) tail
                         _ -> [indent 2 varF.name]
   where
-    k = String.length varF.name
+  k = String.length varF.name
 
 splitWords :: Int -> String -> Array String
 splitWords n =
   Array.fromFoldable <<< go Nil 0 <<< List.fromFoldable <<< String.split (Pattern " ")
- where
-       go :: List String -> Int -> List String -> List String
-       go acc _ Nil = prep acc
-       go acc k (w : ws) =
-         let
-           z = String.length w
-         in case unit of
-                 _ | k + z < n -> go (w : acc) (k + z) ws
-                   | z > n     ->
-                     prep acc <>
-                      case String.splitAt n w of
-                          { before, after } -> before : go Nil 0 (after : ws)
-                   | otherwise -> prep acc <> go (List.singleton w) z ws
+  where
+  go :: List String -> Int -> List String -> List String
+  go acc _ Nil = prep acc
+  go acc k (w : ws) =
+    let
+      z = String.length w
+    in case unit of
+            _ | k + z < n -> go (w : acc) (k + z) ws
+              | z > n     ->
+                prep acc <>
+                case String.splitAt n w of
+                    { before, after } -> before : go Nil 0 (after : ws)
+              | otherwise -> prep acc <> go (List.singleton w) z ws
 
-       prep :: List String -> List String
-       prep Nil  = Nil
-       prep acc = List.singleton $ String.joinWith " " $ List.toUnfoldable $ List.reverse acc
+  prep :: List String -> List String
+  prep Nil  = Nil
+  prep acc = List.singleton $ String.joinWith " " $ List.toUnfoldable $ List.reverse acc
 
 indent :: Int -> String -> String
 indent n s =

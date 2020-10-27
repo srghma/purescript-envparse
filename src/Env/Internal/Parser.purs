@@ -3,9 +3,10 @@ module Env.Internal.Parser where
 import Prelude
 
 import Control.Alternative (class Alt, class Alternative, class Plus, alt, empty)
-import Control.Alternative.Free (FreeAlternative, foldFreeAlternative, hoistFreeAlternative, liftFreeAlternative)
 import Control.Monad.Reader.Trans (ReaderT(..), runReaderT)
 import Data.Array as Array
+import Data.Array.NonEmpty (NonEmptyArray)
+import Data.Array.NonEmpty as NonEmptyArray
 import Data.Bifunctor (lmap)
 import Data.Either (Either(..), note)
 import Data.Foldable (traverse_)
@@ -22,21 +23,23 @@ import Data.Tuple (Tuple(..))
 import Env.Internal.Error (EnvError)
 import Env.Internal.Error as Error
 import Env.Internal.Free as Free
+import Env.Internal.Free (Alt)
 import Env.Internal.Val (Val)
 import Env.Internal.Val as Val
 import Foreign.Object (Object)
 import Foreign.Object as Object
+import Debug.Trace
 
 -- | Try to parse a pure environment
 parsePure :: forall e a . Error.AsUnset e => Parser e a -> Object String -> Either (Array (Tuple String e)) a
 parsePure (Parser p) env =
-  Val.toEither (foldFreeAlternative go' p)
+  Val.toEither (Free.runAlt go' p)
   where
     go :: forall a' . VarF e a' -> Either (Tuple String e) a'
-    go (VarF varF) =
-      case lookupVar (VarF varF) env of
+    go (VarF varF) = spy ("lookup res " <> varF.name) $
+      case spy ("lookup input " <> varF.name) $ lookupVar (VarF varF) env of
         Left lookupErr ->
-          maybe (Left lookupErr) Right varF.def
+          maybe (Left lookupErr) Right (spy ("lookup def " <> varF.name) $ varF.def)
         Right val ->
           readVar (VarF varF) val
 
@@ -49,7 +52,7 @@ traverseSensitiveVar (Parser parser) f =
  where
     sensitiveVars :: Set String
     sensitiveVars =
-      Free.foldMonoidFreeAlternative (\(VarF varF) -> if varF.sensitive then Set.singleton varF.name else Set.empty) parser
+      Free.foldAlt (\(VarF varF) -> if varF.sensitive then Set.singleton varF.name else Set.empty) parser
 
 readVar :: forall e a . VarF e a -> String -> Either (Tuple String e) a
 readVar (VarF varF) =
@@ -64,7 +67,7 @@ addName name =
   lmap (Tuple name)
 
 -- | An environment parser
-newtype Parser e a = Parser (FreeAlternative (VarF e) a)
+newtype Parser e a = Parser (Alt (VarF e) a)
 
 derive instance newtypeParser :: Newtype (Parser e a) _
 derive instance functorParser :: Functor (Parser e)
@@ -86,13 +89,13 @@ instance alternativeParser :: Monoid e => Alternative (Parser e)
 -- | The string to prepend to the name of every declared environment variable
 prefixed :: forall e a . String -> Parser e a -> Parser e a
 prefixed pre =
-  Parser <<< hoistFreeAlternative (\(VarF varF) -> VarF (varF { name = pre <> varF.name })) <<< unwrap
+  Parser <<< Free.hoistAlt (\(VarF varF) -> VarF (varF { name = pre <> varF.name })) <<< unwrap
 
 -- | Mark the enclosed variables as sensitive to remove them from the environment
 -- once they've been parsed successfully.
 sensitive :: forall e a . Parser e a -> Parser e a
 sensitive =
-  Parser <<< hoistFreeAlternative (\(VarF varF) -> VarF (varF { sensitive = true })) <<< unwrap
+  Parser <<< Free.hoistAlt (\(VarF varF) -> VarF (varF { sensitive = true })) <<< unwrap
 
 newtype VarF e a = VarF
   { name      :: String
@@ -107,7 +110,7 @@ derive instance functorVarF :: Functor (VarF e)
 
 liftVarF :: forall e a . VarF e a -> Parser e a
 liftVarF =
-  Parser <<< liftFreeAlternative
+  Parser <<< Free.liftAlt
 
 -- | An environment variable's value parser. Use @(<=<)@ and @(>=>)@ to combine these
 type EnvReader e a = ReaderT String (Either e) a
@@ -134,7 +137,8 @@ var reader name varConfig =
 -- /Note:/ this parser never fails.
 flag
   :: forall e a
-   . a -- ^ default value
+   . Show a
+  => a -- ^ default value
   -> a -- ^ active value
   -> String -> Flag a -> Parser e a
 flag f t n flagConfig =
@@ -146,7 +150,7 @@ flag f t n flagConfig =
           Right _ -> t
     , help: flagConfig.help
     , def: Just f
-    , helpDef: Nothing
+    , helpDef: Just (show f)
     , sensitive: flagConfig.sensitive
     }
 

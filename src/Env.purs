@@ -19,6 +19,7 @@ import Node.Process as NodeProcess
 import Env.Internal.Error as Export
 import Env.Internal.Parser as Export
 import Env.Internal.Help as Export
+import Debug.Trace
 
 parse :: forall e a . Error.AsUnset e => Help.Info e -> Parser e a -> Effect a
 parse m =
@@ -30,7 +31,7 @@ parse m =
 parseOr :: forall e a b . Error.AsUnset e => (String -> Effect a) -> Help.Info e -> Parser e b -> Effect (Either a b)
 parseOr onFailure info parser = do
   b <- map (parsePure parser) NodeProcess.getEnv
-  for_ b $ \_ ->
+  for_ (spy "b" b) $ \_ ->
     traverseSensitiveVar parser NodeProcess.unsetEnv
   traverseLeft (onFailure <<< Help.helpInfo info parser) b
 
