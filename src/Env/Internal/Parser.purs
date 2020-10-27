@@ -5,8 +5,6 @@ import Prelude
 import Control.Alternative (class Alt, class Alternative, class Plus, alt, empty)
 import Control.Monad.Reader.Trans (ReaderT(..), runReaderT)
 import Data.Array as Array
-import Data.Array.NonEmpty (NonEmptyArray)
-import Data.Array.NonEmpty as NonEmptyArray
 import Data.Bifunctor (lmap)
 import Data.Either (Either(..), note)
 import Data.Foldable (traverse_)
@@ -28,7 +26,6 @@ import Env.Internal.Val (Val)
 import Env.Internal.Val as Val
 import Foreign.Object (Object)
 import Foreign.Object as Object
-import Debug.Trace
 
 -- | Try to parse a pure environment
 parsePure :: forall e a . Error.AsUnset e => Parser e a -> Object String -> Either (Array (Tuple String e)) a
@@ -36,10 +33,10 @@ parsePure (Parser p) env =
   Val.toEither (Free.runAlt go' p)
   where
     go :: forall a' . VarF e a' -> Either (Tuple String e) a'
-    go (VarF varF) = spy ("lookup res " <> varF.name) $
-      case spy ("lookup input " <> varF.name) $ lookupVar (VarF varF) env of
+    go (VarF varF) =
+      case lookupVar (VarF varF) env of
         Left lookupErr ->
-          maybe (Left lookupErr) Right (spy ("lookup def " <> varF.name) $ varF.def)
+          maybe (Left lookupErr) Right varF.def
         Right val ->
           readVar (VarF varF) val
 

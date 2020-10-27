@@ -17,7 +17,6 @@ import Data.Newtype (unwrap)
 import Data.String as String
 import Data.String.Pattern (Pattern(..))
 import Env.Internal.Error as Error
-import Env.Internal.Free (Alt)
 import Env.Internal.Free as Free
 
 helpInfo :: forall e a . Info e -> Parser e a -> Array (Tuple String e) -> String

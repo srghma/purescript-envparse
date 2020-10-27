@@ -6,7 +6,6 @@ module Env
 import Data.Either (Either(..), either)
 import Effect (Effect)
 import Effect.Exception.Unsafe (unsafeThrow)
-import Env.Internal.Error (EnvError)
 import Env.Internal.Parser (Parser, parsePure, traverseSensitiveVar)
 import Prelude
 
@@ -16,10 +15,9 @@ import Env.Internal.Error as Error
 import Env.Internal.Help as Help
 import Node.Process as NodeProcess
 
-import Env.Internal.Error as Export
-import Env.Internal.Parser as Export
-import Env.Internal.Help as Export
-import Debug.Trace
+import Env.Internal.Error (class AsEmpty, class AsUnread, class AsUnset, EnvError(..), empty, tryEmpty, tryUnread, tryUnset, unread, unset) as Export
+import Env.Internal.Parser (EnvReader, Flag, Parser(..), Var, VarF(..), addName, char, defaultFlag, defaultSensitive, defaultVar, flag, liftVarF, lookupVar, nonEmptyString, parsePure, prefixed, readVar, sensitive, split, str, switch, traverseSensitiveVar, var) as Export
+import Env.Internal.Help (ErrorHandler, Info, defaultErrorHandler, defaultInfo, handleEmptyError, handleUnreadError, handleUnsetError, helpDoc, helpErrors, helpInfo, helpParserDoc, helpVarfDoc, indent, splitWords, varName) as Export
 
 parse :: forall e a . Error.AsUnset e => Help.Info e -> Parser e a -> Effect a
 parse m =
@@ -31,7 +29,7 @@ parse m =
 parseOr :: forall e a b . Error.AsUnset e => (String -> Effect a) -> Help.Info e -> Parser e b -> Effect (Either a b)
 parseOr onFailure info parser = do
   b <- map (parsePure parser) NodeProcess.getEnv
-  for_ (spy "b" b) $ \_ ->
+  for_ b $ \_ ->
     traverseSensitiveVar parser NodeProcess.unsetEnv
   traverseLeft (onFailure <<< Help.helpInfo info parser) b
 
