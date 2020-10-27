@@ -10,10 +10,9 @@
   , "lists"
   , "ordered-collections"
   , "strings"
-  , "free-alternative"
   , "node-process"
   , "transformers"
-  , "debug"
+  , "exists"
   ]
 , packages = ./packages.dhall
 , sources = [ "src/**/*.purs", "test/**/*.purs" ]
