@@ -1,15 +1,15 @@
 module Env.Internal.Parser where
 
-import Control.Alternative (class Alt, class Alternative, class Plus, alt, empty)
-import Control.Alternative.Free (FreeAlternative, foldFreeAlternative, hoistFreeAlternative, liftFreeAlternative)
-import Data.Either (Either(..), note)
-import Data.Maybe (Maybe(..), maybe)
-import Data.Tuple (Tuple(..))
 import Prelude
 
+import Control.Alternative (class Alt, class Alternative, class Plus, alt, empty)
+import Control.Alternative.Free (FreeAlternative, foldFreeAlternative, hoistFreeAlternative, liftFreeAlternative)
+import Control.Monad.Reader.Trans (ReaderT(..), runReaderT)
 import Data.Array as Array
 import Data.Bifunctor (lmap)
+import Data.Either (Either(..), note)
 import Data.Foldable (traverse_)
+import Data.Maybe (Maybe(..), maybe)
 import Data.Newtype (class Newtype, unwrap)
 import Data.Set (Set)
 import Data.Set as Set
@@ -18,13 +18,14 @@ import Data.String.Common (split) as String
 import Data.String.NonEmpty (NonEmptyString)
 import Data.String.NonEmpty as NonEmptyString
 import Data.String.Pattern (Pattern)
+import Data.Tuple (Tuple(..))
 import Env.Internal.Error (EnvError)
 import Env.Internal.Error as Error
+import Env.Internal.Free as Free
 import Env.Internal.Val (Val)
 import Env.Internal.Val as Val
 import Foreign.Object (Object)
 import Foreign.Object as Object
-import Env.Internal.Free as Free
 
 -- | Try to parse a pure environment
 parsePure :: forall e a . Error.AsUnset e => Parser e a -> Object String -> Either (Array (Tuple String e)) a
@@ -52,7 +53,7 @@ traverseSensitiveVar (Parser parser) f =
 
 readVar :: forall e a . VarF e a -> String -> Either (Tuple String e) a
 readVar (VarF varF) =
-  addName varF.name <<< varF.reader
+  addName varF.name <<< runReaderT varF.reader
 
 lookupVar :: forall e a . Error.AsUnset e => VarF e a -> Object String -> Either (Tuple String e) String
 lookupVar (VarF varF) =
@@ -95,7 +96,7 @@ sensitive =
 
 newtype VarF e a = VarF
   { name      :: String
-  , reader    :: Reader e a
+  , reader    :: EnvReader e a
   , help      :: Maybe String
   , def       :: Maybe a
   , helpDef   :: Maybe String
@@ -109,18 +110,18 @@ liftVarF =
   Parser <<< liftFreeAlternative
 
 -- | An environment variable's value parser. Use @(<=<)@ and @(>=>)@ to combine these
-type Reader e a = String -> Either e a
+type EnvReader e a = ReaderT String (Either e) a
 
 -- | Parse a particular variable from the environment
 --
 -- @
 -- >>> var 'str' \"EDITOR\" ('def' \"vim\" <> 'helpDef' show)
 -- @
-var :: forall e a . Error.AsUnset e => Reader e a -> String -> Var a -> Parser e a
-var r n varConfig =
+var :: forall e a . Error.AsUnset e => EnvReader e a -> String -> Var a -> Parser e a
+var reader name varConfig =
   liftVarF $ VarF
-    { name: n
-    , reader: r
+    { name
+    , reader
     , help: varConfig.help
     , def: varConfig.def
     , helpDef: varConfig.helpDef <*> varConfig.def
@@ -139,8 +140,8 @@ flag
 flag f t n flagConfig =
   liftVarF $ VarF
     { name: n
-    , reader: \val ->
-        pure $ case (nonEmptyString :: Reader EnvError NonEmptyString) val of
+    , reader: ReaderT \val ->
+        pure $ case runReaderT (nonEmptyString :: EnvReader EnvError NonEmptyString) val of
           Left  _ -> f
           Right _ -> t
     , help: flagConfig.help
@@ -157,20 +158,20 @@ switch =
   flag false true
 
 -- | The trivial reader
-str :: forall e . Reader e String
-str = Right
+str :: forall e . EnvReader e String
+str = ReaderT Right
 
 -- | The reader that accepts only non-empty strings
-nonEmptyString :: forall e . Error.AsEmpty e => Reader e NonEmptyString
-nonEmptyString = NonEmptyString.fromString >>> note Error.empty
+nonEmptyString :: forall e . Error.AsEmpty e => EnvReader e NonEmptyString
+nonEmptyString = ReaderT $ NonEmptyString.fromString >>> note Error.empty
 
 -- | The single character string reader
-char :: forall e . Error.AsUnread e => Reader e Char
-char s = String.toChar s # note (Error.unread "must be a one-character string")
+char :: forall e . Error.AsUnread e => EnvReader e Char
+char = ReaderT $ \s -> String.toChar s # note (Error.unread "must be a one-character string")
 
 -- | The reader that splits a string into a list of strings consuming the separator.
-split :: forall e . Pattern -> Reader e (Array String)
-split sep = Right <<< String.split sep
+split :: forall e . Pattern -> EnvReader e (Array String)
+split sep = ReaderT $ Right <<< String.split sep
 
 -- | Environment variable metadata
 type Var a =

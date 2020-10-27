@@ -12,6 +12,7 @@
   , "strings"
   , "free-alternative"
   , "node-process"
+  , "transformers"
   ]
 , packages = ./packages.dhall
 , sources = [ "src/**/*.purs", "test/**/*.purs" ]
