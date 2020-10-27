@@ -1,76 +1,116 @@
 module Env.Internal.Parser where
 
--- | Try to parse a pure environment
-parsePure :: Error.AsUnset e => Parser e a -> [(String, String)] -> Either [(String, e)] a
-parsePure (Parser p) (Map.fromList -> env) =
-  toEither (runAlt (fromEither . left pure . go) p)
- where
-  go v@VarF {..} =
-    case lookupVar v env of
-      Left lookupErr ->
-        maybe (Left lookupErr) pure varfDef
-      Right val ->
-        readVar v val
+import Control.Alt
+import Control.Alternative
+import Control.Alternative.Free
+import Data.Either
+import Data.Maybe
+import Data.Tuple
+import Prelude
 
-traverseSensitiveVar :: Applicative m => Parser e a -> (String -> m b) -> m ()
-traverseSensitiveVar Parser {unParser} f =
+import Data.Array as Array
+import Data.Bifunctor (lmap)
+import Data.Foldable (fold, foldMap, traverse_)
+import Data.Map (Map)
+import Data.Map as Map
+import Data.Newtype (class Newtype, unwrap)
+import Data.Set (Set)
+import Data.Set as Set
+import Data.String.CodeUnits as String
+import Data.String.NonEmpty (NonEmptyString)
+import Data.String.NonEmpty as NonEmptyString
+import Data.String.Pattern (Pattern(..))
+import Data.String.Pattern as String
+import Data.String.Common as String
+import Env.Internal.Error (EnvError)
+import Env.Internal.Error as Error
+import Env.Internal.Val (Val)
+import Env.Internal.Val as Val
+import Unsafe.Coerce (unsafeCoerce)
+
+-- | Try to parse a pure environment
+parsePure :: forall e a . Error.AsUnset e => Parser e a -> Array (Tuple String String) -> Either (Array (Tuple String e)) a
+parsePure (Parser p) env =
+  Val.toEither (foldFreeAlternative go' p)
+  where
+    env' = Map.fromFoldable env
+
+    go :: forall a' . VarF e a' -> Either (Tuple String e) a'
+    go (VarF varF) =
+      case lookupVar (VarF varF) env' of
+        Left lookupErr ->
+          maybe (Left lookupErr) Right varF.varfDef
+        Right val ->
+          readVar (VarF varF) val
+
+    go' :: forall a' . VarF e a' -> Val (Array (Tuple String e)) a'
+    go' = Val.fromEither <<< lmap Array.singleton <<< go
+
+traverseSensitiveVar :: forall m e a b . Applicative m => Parser e a -> (String -> m b) -> m Unit
+traverseSensitiveVar (Parser parser) f =
   traverse_ f sensitiveVars
  where
-  sensitiveVars =
-    foldAlt (\VarF {varfSensitive, varfName} -> if varfSensitive then Set.singleton varfName else Set.empty) unParser
+    sensitiveVars :: Set String
+    sensitiveVars = unsafeCoerce unit
+      -- | foldMap (\(VarF varF) -> if varF.varfSensitive then Set.singleton varF.varfName else Set.empty) parser
 
-readVar :: VarF e a -> String -> Either (String, e) a
-readVar VarF {..} =
-  addName varfName . varfReader
+readVar :: forall e a . VarF e a -> String -> Either (Tuple String e) a
+readVar (VarF varF) =
+  addName varF.varfName <<< varF.varfReader
 
-lookupVar :: Error.AsUnset e => VarF e a -> Map String String -> Either (String, e) String
-lookupVar VarF {..} =
-  addName varfName . maybe (Left Error.unset) Right . Map.lookup varfName
+lookupVar :: forall e a . Error.AsUnset e => VarF e a -> Map String String -> Either (Tuple String e) String
+lookupVar (VarF varF) =
+  addName varF.varfName <<< maybe (Left Error.unset) Right <<< Map.lookup varF.varfName
 
-addName :: String -> Either e a -> Either (String, e) a
+addName :: forall e a . String -> Either e a -> Either (Tuple String e) a
 addName name =
-  left ((,) name)
+  lmap (Tuple name)
 
 -- | An environment parser
-newtype Parser e a = Parser { unParser :: Alt (VarF e) a }
-    deriving (Functor)
+newtype Parser e a = Parser (FreeAlternative (VarF e) a)
 
-instance Applicative (Parser e) where
-  pure =
-    Parser . pure
-  Parser f <*> Parser x =
-    Parser (f <*> x)
+derive instance newtypeParser :: Newtype (Parser e a) _
+derive instance functorParser :: Functor (Parser e)
 
-instance Alternative (Parser e) where
-  empty =
-    Parser empty
-  Parser f <|> Parser x =
-    Parser (f <|> x)
+instance applyParser :: Apply (Parser e) where
+  apply (Parser f) (Parser x) = Parser (apply f x)
+
+instance applicativeParser :: Applicative (Parser e) where
+  pure = Parser <<< pure
+
+instance altParser :: Alt (Parser e) where
+  alt (Parser f) (Parser x) = Parser (alt f x)
+
+instance plusParser :: Monoid e => Plus (Parser e) where
+  empty = Parser empty
+
+instance alternativeParser :: Monoid e => Alternative (Parser e)
 
 -- | The string to prepend to the name of every declared environment variable
-prefixed :: String -> Parser e a -> Parser e a
+prefixed :: forall e a . String -> Parser e a -> Parser e a
 prefixed pre =
-  Parser . hoistAlt (\v -> v {varfName=pre ++ varfName v}) . unParser
+  Parser <<< hoistFreeAlternative (\(VarF varF) -> VarF (varF { varfName = pre <> varF.varfName })) <<< unwrap
 
 -- | Mark the enclosed variables as sensitive to remove them from the environment
 -- once they've been parsed successfully.
-sensitive :: Parser e a -> Parser e a
+sensitive :: forall e a . Parser e a -> Parser e a
 sensitive =
-  Parser . hoistAlt (\v -> v {varfSensitive = True}) . unParser
+  Parser <<< hoistFreeAlternative (\(VarF varF) -> VarF (varF { varfSensitive = true })) <<< unwrap
 
-
-data VarF e a = VarF
+newtype VarF e a = VarF
   { varfName      :: String
   , varfReader    :: Reader e a
   , varfHelp      :: Maybe String
   , varfDef       :: Maybe a
   , varfHelpDef   :: Maybe String
-  , varfSensitive :: Bool
-  } deriving (Functor)
+  , varfSensitive :: Boolean
+  }
 
-liftVarF :: VarF e a -> Parser e a
+derive instance functorVarF :: Functor (VarF e)
+
+liftVarF :: forall e a . VarF e a -> Parser e a
 liftVarF =
-  Parser . liftAlt
+  Parser <<< liftFreeAlternative
 
 -- | An environment variable's value parser. Use @(<=<)@ and @(>=>)@ to combine these
 type Reader e a = String -> Either e a
@@ -80,163 +120,93 @@ type Reader e a = String -> Either e a
 -- @
 -- >>> var 'str' \"EDITOR\" ('def' \"vim\" <> 'helpDef' show)
 -- @
-var :: Error.AsUnset e => Reader e a -> String -> Mod Var a -> Parser e a
-var r n (Mod f) =
+var :: forall e a . Error.AsUnset e => Reader e a -> String -> (Var a -> Var a) -> Parser e a
+var r n mod =
   liftVarF $ VarF
-    { varfName = n
-    , varfReader = r
-    , varfHelp = varHelp
-    , varfDef = varDef
-    , varfHelpDef = varHelpDef <*> varDef
-    , varfSensitive = varSensitive
+    { varfName: n
+    , varfReader: r
+    , varfHelp: varHelp
+    , varfDef: varDef
+    , varfHelpDef: varHelpDef <*> varDef
+    , varfSensitive: varSensitive
     }
  where
-  Var {varHelp, varDef, varHelpDef, varSensitive} = f defaultVar
+  { varHelp, varDef, varHelpDef, varSensitive } = mod defaultVar
 
 -- | A flag that takes the active value if the environment variable
 -- is set and non-empty and the default value otherwise
 --
 -- /Note:/ this parser never fails.
 flag
-  :: a -- ^ default value
+  :: forall e a
+   . a -- ^ default value
   -> a -- ^ active value
-  -> String -> Mod Flag a -> Parser e a
-flag f t n (Mod g) =
+  -> String -> (Flag a -> Flag a) -> Parser e a
+flag f t n mod =
   liftVarF $ VarF
-    { varfName = n
-    , varfReader = \val ->
-        pure $ case (nonempty :: Reader Error.Error String) val of
+    { varfName: n
+    , varfReader: \val ->
+        pure $ case (nonempty :: Reader EnvError NonEmptyString) val of
           Left  _ -> f
           Right _ -> t
-    , varfHelp = flagHelp
-    , varfDef = Just f
-    , varfHelpDef = Nothing
-    , varfSensitive = flagSensitive
+    , varfHelp: flagHelp
+    , varfDef: Just f
+    , varfHelpDef: Nothing
+    , varfSensitive: flagSensitive
     }
  where
-  Flag {flagHelp, flagSensitive} = g defaultFlag
+  { flagHelp, flagSensitive } = mod defaultFlag
 
 -- | A simple boolean 'flag'
 --
 -- /Note:/ this parser never fails.
-switch :: String -> Mod Flag Bool -> Parser e Bool
+switch :: forall e . String -> (Flag Boolean -> Flag Boolean) -> Parser e Boolean
 switch =
-  flag False True
+  flag false true
 
 -- | The trivial reader
-str :: IsString s => Reader e s
-str =
-  Right . fromString
+str :: forall e . Reader e String
+str = Right
 
 -- | The reader that accepts only non-empty strings
-nonempty :: (Error.AsEmpty e, IsString s) => Reader e s
-nonempty =
-  fmap fromString . go where go [] = Left Error.empty; go xs = Right xs
-
--- | The reader that uses the 'Read' instance of the type
-auto :: (Error.AsUnread e, Read a) => Reader e a
-auto s =
-  case reads s of [(v, "")] -> Right v; _ -> Left (Error.unread (show s))
+nonempty :: forall e . Error.AsEmpty e => Reader e NonEmptyString
+nonempty = NonEmptyString.fromString >>> note Error.empty
 
 -- | The single character string reader
-char :: Error.AsUnread e => Reader e Char
-char s =
-  case s of [c] -> Right c; _ -> Left (Error.unread "must be a one-character string")
+char :: forall e . Error.AsUnread e => Reader e Char
+char s = String.toChar s # note (Error.unread "must be a one-character string")
 
 -- | The reader that splits a string into a list of strings consuming the separator.
-splitOn :: Char -> Reader e [String]
-splitOn sep = Right . go
- where
-  go [] = []
-  go xs = go' xs
-
-  go' xs =
-    case break (== sep) xs of
-      (ys, []) ->
-        ys : []
-      (ys, _ : zs) ->
-        ys : go' zs
-
-
--- | This represents a modification of the properties of a particular 'Parser'.
--- Combine them using the 'Monoid' instance.
-newtype Mod t a = Mod (t a -> t a)
-
-#if MIN_VERSION_base(4,9,0)
-instance Semigroup (Mod t a) where
-  Mod f <> Mod g = Mod (g . f)
-#endif
-
-instance Monoid (Mod t a) where
-  mempty = Mod id
-#if MIN_VERSION_base(4,11,0)
-#elif MIN_VERSION_base(4,9,0)
-  mappend = (<>)
-#else
-  mappend (Mod f) (Mod g) = Mod (g . f)
-#endif
+split :: forall e . Pattern -> Reader e (Array String)
+split sep = Right <<< String.split sep
 
 -- | Environment variable metadata
-data Var a = Var
+type Var a =
   { varHelp      :: Maybe String
   , varHelpDef   :: Maybe (a -> String)
   , varDef       :: Maybe a
-  , varSensitive :: Bool
+  , varSensitive :: Boolean
   }
 
-defaultVar :: Var a
-defaultVar = Var
-  { varHelp = Nothing
-  , varDef = Nothing
-  , varHelpDef = Nothing
-  , varSensitive = defaultSensitive
+defaultVar :: forall a . Var a
+defaultVar =
+  { varHelp: Nothing
+  , varDef: Nothing
+  , varHelpDef: Nothing
+  , varSensitive: defaultSensitive
   }
 
-defaultSensitive :: Bool
-defaultSensitive = False
-
--- | The default value of the variable
---
--- /Note:/ specifying it means the parser won't ever fail.
-def :: a -> Mod Var a
-def d =
-  Mod (\v -> v {varDef=Just d})
+defaultSensitive :: Boolean
+defaultSensitive = false
 
 -- | Flag metadata
-data Flag a = Flag
+type Flag a =
   { flagHelp      :: Maybe String
-  , flagSensitive :: Bool
+  , flagSensitive :: Boolean
   }
 
-defaultFlag :: Flag a
-defaultFlag = Flag
-  { flagHelp = Nothing
-  , flagSensitive = defaultSensitive
+defaultFlag :: forall a . Flag a
+defaultFlag =
+  { flagHelp: Nothing
+  , flagSensitive: defaultSensitive
   }
-
--- | Show the default value of the variable in help.
-helpDef :: (a -> String) -> Mod Var a
-helpDef d =
-  Mod (\v -> v {varHelpDef=Just d})
-
--- | Use the 'Show' instance to show the default value of the variable in help.
-showDef :: Show a => Mod Var a
-showDef =
-  helpDef show
-
-
--- | A class of things that can have a help message attached to them
-class HasHelp t where
-  setHelp :: String -> t a -> t a
-
-instance HasHelp Var where
-  setHelp h v = v {varHelp=Just h}
-
-instance HasHelp Flag where
-  setHelp h v = v {flagHelp=Just h}
-
--- | Attach help text to the variable
-help :: HasHelp t => String -> Mod t a
-help =
-  Mod . setHelp
-

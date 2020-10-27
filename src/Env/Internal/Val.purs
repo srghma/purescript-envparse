@@ -1,29 +1,47 @@
 module Env.Internal.Val where
 
+import Control.Alt
+import Data.Either
+import Data.Generic.Rep
+import Data.Generic.Rep.Show
+import Prelude
+
+import Control.Alternative
+
 -- | A type isomorphic to 'Either' with the accumulating 'Applicative' instance.
 data Val e a
   = Err e
   | Ok  a
-    deriving (Functor, Show, Eq)
 
-instance Monoid e => Applicative (Val e) where
+derive instance functorVal :: Functor (Val a)
+derive instance eqVal :: (Eq e, Eq a) => Eq (Val e a)
+derive instance genericVal :: Generic (Val e a) _
+instance showVal :: (Show e, Show a) => Show (Val e a) where show x = genericShow x
+
+instance applyVal :: Monoid e => Apply (Val e) where
+  apply (Err e) (Err e') = Err (e <> e')
+  apply (Err e) _        = Err e
+  apply _       (Err e') = Err e'
+  apply (Ok  f) (Ok  a)  = Ok (f a)
+
+instance applicativeVal :: Monoid e => Applicative (Val e) where
   pure = Ok
 
-  Err e <*> Err e' = Err (e <> e')
-  Err e <*> _      = Err e
-  _     <*> Err e' = Err e'
-  Ok  f <*> Ok  a  = Ok (f a)
+instance altVal :: Alt (Val e) where
+  alt (Err _) r = r
+  alt l        _ = l
 
-instance Monoid e => Alternative (Val e) where
+instance plusVal :: Monoid e => Plus (Val e) where
   empty = Err mempty
 
-  Err _ <|> Ok x = Ok x
-  x     <|> _    = x
+instance alternativeVal :: Monoid e => Alternative (Val e)
 
-fromEither :: Either e a -> Val e a
+fromEither :: forall e a . Either e a -> Val e a
 fromEither =
   either Err Ok
 
-toEither :: Val e a -> Either e a
+toEither :: forall e a . Val e a -> Either e a
 toEither x =
-  case x of Err e -> Left e; Ok a -> Right a
+  case x of
+       Err e -> Left e
+       Ok a -> Right a

@@ -16,11 +16,11 @@ inspect (Alt x y) = concat ["(", inspect x, ") <|> (", inspect y, ")"]
 inspect (Lift _)  = "Lift _"
 
 instance Functor f => Functor (Alt f) where
-  fmap _ Nope      = Nope
-  fmap f (Pure a)  = Pure (f a)
-  fmap f (Ap a v)  = Ap (fmap (f .) a) v
-  fmap f (Alt a b) = Alt (fmap f a) (fmap f b)
-  fmap f (Lift a)  = Lift (fmap f a)
+  map _ Nope      = Nope
+  map f (Pure a)  = Pure (f a)
+  map f (Ap a v)  = Ap (map (f .) a) v
+  map f (Alt a b) = Alt (map f a) (map f b)
+  map f (Lift a)  = Lift (map f a)
 
 instance Functor f => Applicative (Alt f) where
   pure = Pure
@@ -45,11 +45,11 @@ runAlt u = go where
 
 foldAlt :: Monoid p => (forall a. f a -> p) -> Alt f b -> p
 foldAlt f =
-  unMon . runAlt (Mon . f)
+  unMon <<< runAlt (Mon <<< f)
 
 hoistAlt :: forall f g b. Functor g => (forall a. f a -> g a) -> Alt f b -> Alt g b
 hoistAlt nat =
-  runAlt (Lift . nat)
+  runAlt (Lift <<< nat)
 
 
 -- | The 'Alternative' functor induced by the 'Monoid'
@@ -58,7 +58,7 @@ newtype Mon m a = Mon
   } deriving (Show, Eq)
 
 instance Functor (Mon m) where
-  fmap _ (Mon a) = Mon a
+  map _ (Mon a) = Mon a
 
 instance Monoid m => Applicative (Mon m) where
   pure _ = Mon mempty

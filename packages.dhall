@@ -1,8 +1,21 @@
 let upstream =
-      https://github.com/purescript/package-sets/releases/download/psc-0.13.8-20200922/packages.dhall sha256:5edc9af74593eab8834d7e324e5868a3d258bbab75c5531d2eb770d4324a2900
+      https://github.com/purescript/package-sets/releases/download/psc-0.13.8-20201021/packages.dhall sha256:55ebdbda1bd6ede4d5307fbc1ef19988c80271b4225d833c8d6fb9b6fb1aa6d8
 
 let overrides = {=}
 
-let additions = {=}
+let additions =
+  { free-alternative =
+    { dependencies =
+      [ "console"
+      , "effect"
+      , "psci-support"
+      , "spec"
+      , "free"
+      , "freeap"
+      ]
+    , repo = "https://github.com/srghma/purescript-free-alternative.git"
+    , version = "master"
+    }
+  }
 
 in  upstream // overrides // additions

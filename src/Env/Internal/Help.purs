@@ -1,25 +1,34 @@
 module Env.Internal.Help where
 
+import Data.Either
+import Data.Generic.Rep.Show
+import Env.Internal.Error
+import Prelude
 
-helpInfo :: Info e -> Parser e b -> [(String, e)] -> String
-helpInfo Info {infoHeader, infoDesc, infoFooter, infoHandleError} p errors =
+import Data.Foldable (oneOf)
+import Data.Generic.Rep (class Generic)
+import Data.List (List(..), (:))
+import Data.Maybe
+
+helpInfo :: Info e -> Parser e b -> Array (Tuple String e) -> String
+helpInfo {header, desc, footer, handleError} p errors =
   List.intercalate "\n\n" $ catMaybes
-    [ infoHeader
-    , fmap (List.intercalate "\n" . splitWords 50) infoDesc
+    [ header
+    , map (List.intercalate "\n" <<< splitWords 50) desc
     , Just (helpDoc p)
-    , fmap (List.intercalate "\n" . splitWords 50) infoFooter
-    ] ++ helpErrors infoHandleError errors
+    , map (List.intercalate "\n" <<< splitWords 50) footer
+    ] <> helpErrors handleError errors
 
 -- | A pretty-printed list of recognized environment variables suitable for usage messages
 helpDoc :: Parser e a -> String
 helpDoc p =
   List.intercalate "\n" ("Available environment variables:\n" : helpParserDoc p)
 
-helpParserDoc :: Parser e a -> [String]
+helpParserDoc :: Parser e a -> Array String
 helpParserDoc =
-  concat . Map.elems . foldAlt (\v -> Map.singleton (varfName v) (helpVarfDoc v)) . unParser
+  concat <<< Map.elems <<< foldAlt (\v -> Map.singleton (varfName v) (helpVarfDoc v)) <<< unParser
 
-helpVarfDoc :: VarF e a -> [String]
+helpVarfDoc :: VarF e a -> Array String
 helpVarfDoc VarF {varfName, varfHelp, varfHelpDef} =
   case varfHelp of
     Nothing -> [indent 2 varfName]
@@ -27,20 +36,20 @@ helpVarfDoc VarF {varfName, varfHelp, varfHelpDef} =
       | k > 15    -> indent 2 varfName : map (indent 25) (splitWords 30 t)
       | otherwise ->
           case zipWith indent (23 - k : repeat 25) (splitWords 30 t) of
-            (x : xs) -> (indent 2 varfName ++ x) : xs
+            (x : xs) -> (indent 2 varfName <> x) : xs
             []       -> [indent 2 varfName]
      where k = length varfName
-           t = maybe h (\s -> h ++ " (default: " ++ s ++")") varfHelpDef
+           t = maybe h (\s -> h <> " (default: " <> s ++")") varfHelpDef
 
-splitWords :: Int -> String -> [String]
+splitWords :: Int -> String -> Array String
 splitWords n =
-  go [] 0 . words
+  go Nil 0 <<< words
  where
-  go acc _ [] = prep acc
+  go acc _ Nil = prep acc
   go acc k (w : ws)
     | k + z < n = go (w : acc) (k + z) ws
-    | z > n     = prep acc ++ case splitAt n w of (w', w'') -> w' : go [] 0 (w'' : ws)
-    | otherwise = prep acc ++ go [w] z ws
+    | z > n     = prep acc <> case splitAt n w of (Tuple w' w'') -> w' : go Nil 0 (w'' : ws)
+    | otherwise = prep acc <> go [w] z ws
    where
     z = length w
 
@@ -49,66 +58,47 @@ splitWords n =
 
 indent :: Int -> String -> String
 indent n s =
-  replicate n ' ' ++ s
+  replicate n " " <> s
 
-helpErrors :: ErrorHandler e -> [(String, e)] -> [String]
+helpErrors :: ErrorHandler -> Array (Tuple String e) -> Array String
 helpErrors _       [] = []
 helpErrors handler fs =
   [ "Parsing errors:"
-  , List.intercalate "\n" (mapMaybe (uncurry handler) (List.sortBy (comparing varName) fs))
+  , List.intercalate "\n" (mapMaybe (uncurry handler) (List.sortBy (comparing fst) fs))
   ]
 
 -- | Parser's metadata
-data Info e = Info
-  { infoHeader      :: Maybe String
-  , infoDesc        :: Maybe String
-  , infoFooter      :: Maybe String
-  , infoHandleError :: ErrorHandler e
+type Info =
+  { header      :: Maybe String
+  , desc        :: Maybe String
+  , footer      :: Maybe String
+  , handleError :: ErrorHandler
   }
 
 -- | Given a variable name and an error value, try to produce a useful error message
-type ErrorHandler e = String -> e -> Maybe String
+type ErrorHandler = String -> EnvError -> Maybe String
 
-defaultInfo :: Info Error
+defaultInfo :: Info EnvError
 defaultInfo = Info
-  { infoHeader = Nothing
-  , infoDesc = Nothing
-  , infoFooter = Nothing
-  , infoHandleError = defaultErrorHandler
+  { header = Nothing
+  , desc = Nothing
+  , footer = Nothing
+  , handleError = defaultErrorHandler
   }
 
--- | Set the help text header (it usually includes the application's name and version)
-header :: String -> Info e -> Info e
-header h i = i {infoHeader=Just h}
-
--- | Set the short description
-desc :: String -> Info e -> Info e
-desc h i = i {infoDesc=Just h}
-
--- | Set the help text footer (it usually includes examples)
-footer :: String -> Info e -> Info e
-footer h i = i {infoFooter=Just h}
-
--- | An error handler
-handleError :: ErrorHandler e -> Info x -> Info e
-handleError handler i = i {infoHandleError=handler}
-
 -- | The default error handler
-defaultErrorHandler :: (Error.AsUnset e, Error.AsEmpty e, Error.AsUnread e) => ErrorHandler e
+defaultErrorHandler :: ErrorHandler
 defaultErrorHandler name err =
-  asum [handleUnsetError name err, handleEmptyError name err, handleUnreadError name err]
+  oneOf [handleUnsetError name err, handleEmptyError name err, handleUnreadError name err]
 
-handleUnsetError :: Error.AsUnset e => ErrorHandler e
+handleUnsetError :: ErrorHandler
 handleUnsetError name =
-  fmap (\() -> indent 2 (name ++ " is unset")) . Error.tryUnset
+  map (\_ -> indent 2 (name <> " is unset")) <<< tryUnset
 
-handleEmptyError :: Error.AsEmpty e => ErrorHandler e
+handleEmptyError :: ErrorHandler
 handleEmptyError name =
-  fmap (\() -> indent 2 (name ++ " is empty")) . Error.tryEmpty
+  map (\_ -> indent 2 (name <> " is empty")) <<< tryEmpty
 
-handleUnreadError :: Error.AsUnread e => ErrorHandler e
+handleUnreadError :: ErrorHandler
 handleUnreadError name =
-  fmap (\val -> indent 2 (name ++ " has value " ++ val ++ " that cannot be parsed")) . Error.tryUnread
-
-varName :: (String, e) -> String
-varName (n, _) = n
+  map (\val -> indent 2 (name <> " has value " <> val <> " that cannot be parsed")) <<< tryUnread
