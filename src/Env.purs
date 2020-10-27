@@ -1,4 +1,7 @@
-module Env where
+module Env
+  ( module Env
+  , module Export
+  ) where
 
 import Data.Either (Either(..), either)
 import Effect (Effect)
@@ -13,19 +16,23 @@ import Env.Internal.Error as Error
 import Env.Internal.Help as Help
 import Node.Process as NodeProcess
 
-parse :: forall e a . Error.AsUnset e => (Help.Info EnvError -> Help.Info e) -> Parser e a -> Effect a
+import Env.Internal.Error as Export
+import Env.Internal.Parser as Export
+import Env.Internal.Help as Export
+
+parse :: forall e a . Error.AsUnset e => Help.Info e -> Parser e a -> Effect a
 parse m =
   map (either (\_ -> unsafeThrow "absurd") identity) <<< parseOr die m
 
 -- | Try to parse the environment
 --
 -- Use this if simply dying on failure (the behavior of 'parse') is inadequate for your needs.
-parseOr :: forall e a b . Error.AsUnset e => (String -> Effect a) -> (Help.Info EnvError -> Help.Info e) -> Parser e b -> Effect (Either a b)
-parseOr onFailure helpMod parser = do
+parseOr :: forall e a b . Error.AsUnset e => (String -> Effect a) -> Help.Info e -> Parser e b -> Effect (Either a b)
+parseOr onFailure info parser = do
   b <- map (parsePure parser) NodeProcess.getEnv
   for_ b $ \_ ->
     traverseSensitiveVar parser NodeProcess.unsetEnv
-  traverseLeft (onFailure <<< Help.helpInfo (helpMod Help.defaultInfo) parser) b
+  traverseLeft (onFailure <<< Help.helpInfo info parser) b
 
 die :: forall a . String -> Effect a
 die m = do

@@ -22,11 +22,11 @@ import Env.Internal.Free as Free
 helpInfo :: forall e a . Info e -> Parser e a -> Array (Tuple String e) -> String
 helpInfo info p errors =
   String.joinWith "\n\n" $ Array.catMaybes
-    [ info.infoHeader
-    , map (String.joinWith "\n" <<< splitWords 50) info.infoDesc
+    [ info.header
+    , map (String.joinWith "\n" <<< splitWords 50) info.desc
     , Just (helpDoc p)
-    , map (String.joinWith "\n" <<< splitWords 50) info.infoFooter
-    ] <> helpErrors info.infoHandleError errors
+    , map (String.joinWith "\n" <<< splitWords 50) info.footer
+    ] <> helpErrors info.handleError errors
 
 -- | A pretty-printed list of recognized environment variables suitable for usage messages
 helpDoc :: forall e a . Parser e a -> String
@@ -38,18 +38,18 @@ helpParserDoc =
   join <<< Array.fromFoldable <<< Map.values <<< Free.foldMonoidFreeAlternative go <<< unwrap
   where
     go :: forall a' . VarF e a' -> Map String (Array String)
-    go (VarF v) = Map.singleton v.varfName (helpVarfDoc (VarF v))
+    go (VarF v) = Map.singleton v.name (helpVarfDoc (VarF v))
 
 helpVarfDoc :: forall e a . VarF e a -> Array String
 helpVarfDoc (VarF varF) =
-  case varF.varfHelp of
-    Nothing -> [indent 2 varF.varfName]
+  case varF.help of
+    Nothing -> [indent 2 varF.name]
     Just h ->
       let
-          t = maybe h (\s -> h <> " (default: " <> s <>")") varF.varfHelpDef
+          t = maybe h (\s -> h <> " (default: " <> s <>")") varF.helpDef
       in
         case unit of
-          _ | k > 15    -> Array.cons (indent 2 varF.varfName) (map (indent 25) (splitWords 30 t))
+          _ | k > 15    -> Array.cons (indent 2 varF.name) (map (indent 25) (splitWords 30 t))
             | otherwise ->
                 let
                     indentParagraph :: Array String -> Array String
@@ -60,10 +60,10 @@ helpVarfDoc (VarF varF) =
                           else indent 25 v
 
                 in case Array.uncons $ indentParagraph (splitWords 30 t) of
-                        Just { head, tail } -> Array.cons ((indent 2 varF.varfName) <> head) tail
-                        _ -> [indent 2 varF.varfName]
+                        Just { head, tail } -> Array.cons ((indent 2 varF.name) <> head) tail
+                        _ -> [indent 2 varF.name]
   where
-    k = String.length varF.varfName
+    k = String.length varF.name
 
 splitWords :: Int -> String -> Array String
 splitWords n =
@@ -99,10 +99,10 @@ helpErrors handler fs =
 
 -- | Parser's metadata
 type Info e =
-  { infoHeader      :: Maybe String
-  , infoDesc        :: Maybe String
-  , infoFooter      :: Maybe String
-  , infoHandleError :: ErrorHandler e
+  { header      :: Maybe String
+  , desc        :: Maybe String
+  , footer      :: Maybe String
+  , handleError :: ErrorHandler e
   }
 
 -- | Given a variable name and an error value, try to produce a useful error message
@@ -110,10 +110,10 @@ type ErrorHandler e = String -> e -> Maybe String
 
 defaultInfo :: Info EnvError
 defaultInfo =
-  { infoHeader: Nothing
-  , infoDesc: Nothing
-  , infoFooter: Nothing
-  , infoHandleError: defaultErrorHandler
+  { header: Nothing
+  , desc: Nothing
+  , footer: Nothing
+  , handleError: defaultErrorHandler
   }
 
 -- | The default error handler

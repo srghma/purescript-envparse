@@ -35,7 +35,7 @@ parsePure (Parser p) env =
     go (VarF varF) =
       case lookupVar (VarF varF) env of
         Left lookupErr ->
-          maybe (Left lookupErr) Right varF.varfDef
+          maybe (Left lookupErr) Right varF.def
         Right val ->
           readVar (VarF varF) val
 
@@ -48,15 +48,15 @@ traverseSensitiveVar (Parser parser) f =
  where
     sensitiveVars :: Set String
     sensitiveVars =
-      Free.foldMonoidFreeAlternative (\(VarF varF) -> if varF.varfSensitive then Set.singleton varF.varfName else Set.empty) parser
+      Free.foldMonoidFreeAlternative (\(VarF varF) -> if varF.sensitive then Set.singleton varF.name else Set.empty) parser
 
 readVar :: forall e a . VarF e a -> String -> Either (Tuple String e) a
 readVar (VarF varF) =
-  addName varF.varfName <<< varF.varfReader
+  addName varF.name <<< varF.reader
 
 lookupVar :: forall e a . Error.AsUnset e => VarF e a -> Object String -> Either (Tuple String e) String
 lookupVar (VarF varF) =
-  addName varF.varfName <<< maybe (Left Error.unset) Right <<< Object.lookup varF.varfName
+  addName varF.name <<< maybe (Left Error.unset) Right <<< Object.lookup varF.name
 
 addName :: forall e a . String -> Either e a -> Either (Tuple String e) a
 addName name =
@@ -85,21 +85,21 @@ instance alternativeParser :: Monoid e => Alternative (Parser e)
 -- | The string to prepend to the name of every declared environment variable
 prefixed :: forall e a . String -> Parser e a -> Parser e a
 prefixed pre =
-  Parser <<< hoistFreeAlternative (\(VarF varF) -> VarF (varF { varfName = pre <> varF.varfName })) <<< unwrap
+  Parser <<< hoistFreeAlternative (\(VarF varF) -> VarF (varF { name = pre <> varF.name })) <<< unwrap
 
 -- | Mark the enclosed variables as sensitive to remove them from the environment
 -- once they've been parsed successfully.
 sensitive :: forall e a . Parser e a -> Parser e a
 sensitive =
-  Parser <<< hoistFreeAlternative (\(VarF varF) -> VarF (varF { varfSensitive = true })) <<< unwrap
+  Parser <<< hoistFreeAlternative (\(VarF varF) -> VarF (varF { sensitive = true })) <<< unwrap
 
 newtype VarF e a = VarF
-  { varfName      :: String
-  , varfReader    :: Reader e a
-  , varfHelp      :: Maybe String
-  , varfDef       :: Maybe a
-  , varfHelpDef   :: Maybe String
-  , varfSensitive :: Boolean
+  { name      :: String
+  , reader    :: Reader e a
+  , help      :: Maybe String
+  , def       :: Maybe a
+  , helpDef   :: Maybe String
+  , sensitive :: Boolean
   }
 
 derive instance functorVarF :: Functor (VarF e)
@@ -116,18 +116,16 @@ type Reader e a = String -> Either e a
 -- @
 -- >>> var 'str' \"EDITOR\" ('def' \"vim\" <> 'helpDef' show)
 -- @
-var :: forall e a . Error.AsUnset e => Reader e a -> String -> (Var a -> Var a) -> Parser e a
-var r n mod =
+var :: forall e a . Error.AsUnset e => Reader e a -> String -> Var a -> Parser e a
+var r n varConfig =
   liftVarF $ VarF
-    { varfName: n
-    , varfReader: r
-    , varfHelp: varHelp
-    , varfDef: varDef
-    , varfHelpDef: varHelpDef <*> varDef
-    , varfSensitive: varSensitive
+    { name: n
+    , reader: r
+    , help: varConfig.help
+    , def: varConfig.def
+    , helpDef: varConfig.helpDef <*> varConfig.def
+    , sensitive: varConfig.sensitive
     }
- where
-  { varHelp, varDef, varHelpDef, varSensitive } = mod defaultVar
 
 -- | A flag that takes the active value if the environment variable
 -- is set and non-empty and the default value otherwise
@@ -137,26 +135,24 @@ flag
   :: forall e a
    . a -- ^ default value
   -> a -- ^ active value
-  -> String -> (Flag a -> Flag a) -> Parser e a
-flag f t n mod =
+  -> String -> Flag a -> Parser e a
+flag f t n flagConfig =
   liftVarF $ VarF
-    { varfName: n
-    , varfReader: \val ->
-        pure $ case (nonempty :: Reader EnvError NonEmptyString) val of
+    { name: n
+    , reader: \val ->
+        pure $ case (nonEmptyString :: Reader EnvError NonEmptyString) val of
           Left  _ -> f
           Right _ -> t
-    , varfHelp: flagHelp
-    , varfDef: Just f
-    , varfHelpDef: Nothing
-    , varfSensitive: flagSensitive
+    , help: flagConfig.help
+    , def: Just f
+    , helpDef: Nothing
+    , sensitive: flagConfig.sensitive
     }
- where
-  { flagHelp, flagSensitive } = mod defaultFlag
 
 -- | A simple boolean 'flag'
 --
 -- /Note:/ this parser never fails.
-switch :: forall e . String -> (Flag Boolean -> Flag Boolean) -> Parser e Boolean
+switch :: forall e . String -> Flag Boolean -> Parser e Boolean
 switch =
   flag false true
 
@@ -165,8 +161,8 @@ str :: forall e . Reader e String
 str = Right
 
 -- | The reader that accepts only non-empty strings
-nonempty :: forall e . Error.AsEmpty e => Reader e NonEmptyString
-nonempty = NonEmptyString.fromString >>> note Error.empty
+nonEmptyString :: forall e . Error.AsEmpty e => Reader e NonEmptyString
+nonEmptyString = NonEmptyString.fromString >>> note Error.empty
 
 -- | The single character string reader
 char :: forall e . Error.AsUnread e => Reader e Char
@@ -178,18 +174,18 @@ split sep = Right <<< String.split sep
 
 -- | Environment variable metadata
 type Var a =
-  { varHelp      :: Maybe String
-  , varHelpDef   :: Maybe (a -> String)
-  , varDef       :: Maybe a
-  , varSensitive :: Boolean
+  { help      :: Maybe String
+  , helpDef   :: Maybe (a -> String)
+  , def       :: Maybe a
+  , sensitive :: Boolean
   }
 
 defaultVar :: forall a . Var a
 defaultVar =
-  { varHelp: Nothing
-  , varDef: Nothing
-  , varHelpDef: Nothing
-  , varSensitive: defaultSensitive
+  { help: Nothing
+  , def: Nothing
+  , helpDef: Nothing
+  , sensitive: defaultSensitive
   }
 
 defaultSensitive :: Boolean
@@ -197,12 +193,12 @@ defaultSensitive = false
 
 -- | Flag metadata
 type Flag a =
-  { flagHelp      :: Maybe String
-  , flagSensitive :: Boolean
+  { help      :: Maybe String
+  , sensitive :: Boolean
   }
 
 defaultFlag :: forall a . Flag a
 defaultFlag =
-  { flagHelp: Nothing
-  , flagSensitive: defaultSensitive
+  { help: Nothing
+  , sensitive: defaultSensitive
   }
