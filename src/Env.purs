@@ -1,10 +1,10 @@
 module Env where
 
-import Data.Either
-import Effect
-import Effect.Exception.Unsafe
-import Env.Internal.Error
-import Env.Internal.Parser
+import Data.Either (Either(..), either)
+import Effect (Effect)
+import Effect.Exception.Unsafe (unsafeThrow)
+import Env.Internal.Error (EnvError)
+import Env.Internal.Parser (Parser, parsePure, traverseSensitiveVar)
 import Prelude
 
 import Data.Foldable (for_)

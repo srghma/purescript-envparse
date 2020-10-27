@@ -1,12 +1,11 @@
 module Env.Internal.Val where
 
-import Control.Alt
-import Data.Either
-import Data.Generic.Rep
-import Data.Generic.Rep.Show
+import Data.Either (Either(..), either)
+import Data.Generic.Rep (class Generic)
+import Data.Generic.Rep.Show (genericShow)
 import Prelude
 
-import Control.Alternative
+import Control.Alternative (class Alt, class Alternative, class Plus)
 
 -- | A type isomorphic to 'Either' with the accumulating 'Applicative' instance.
 data Val e a

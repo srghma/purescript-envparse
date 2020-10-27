@@ -1,34 +1,29 @@
 module Env.Internal.Parser where
 
-import Control.Alt
-import Control.Alternative
-import Control.Alternative.Free
-import Data.Either
-import Data.Maybe
-import Data.Tuple
+import Control.Alternative (class Alt, class Alternative, class Plus, alt, empty)
+import Control.Alternative.Free (FreeAlternative, foldFreeAlternative, hoistFreeAlternative, liftFreeAlternative)
+import Data.Either (Either(..), note)
+import Data.Maybe (Maybe(..), maybe)
+import Data.Tuple (Tuple(..))
 import Prelude
 
 import Data.Array as Array
 import Data.Bifunctor (lmap)
-import Data.Foldable (fold, foldMap, traverse_)
-import Data.Map (Map)
-import Data.Map as Map
+import Data.Foldable (traverse_)
 import Data.Newtype (class Newtype, unwrap)
 import Data.Set (Set)
 import Data.Set as Set
-import Data.String.CodeUnits as String
-import Data.String.Common as String
+import Data.String.CodeUnits (toChar) as String
+import Data.String.Common (split) as String
 import Data.String.NonEmpty (NonEmptyString)
 import Data.String.NonEmpty as NonEmptyString
-import Data.String.Pattern (Pattern(..))
-import Data.String.Pattern as String
+import Data.String.Pattern (Pattern)
 import Env.Internal.Error (EnvError)
 import Env.Internal.Error as Error
 import Env.Internal.Val (Val)
 import Env.Internal.Val as Val
 import Foreign.Object (Object)
 import Foreign.Object as Object
-import Unsafe.Coerce (unsafeCoerce)
 import Env.Internal.Free as Free
 
 -- | Try to parse a pure environment

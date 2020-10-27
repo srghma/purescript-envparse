@@ -1,18 +1,14 @@
 module Env.Internal.Help where
 
-import Control.Alternative.Free
-import Data.Either
-import Data.Generic.Rep.Show
-import Data.Maybe
-import Data.Tuple
-import Env.Internal.Error
-import Env.Internal.Parser
+import Data.Maybe (Maybe(..), maybe)
+import Data.Tuple (Tuple, fst, uncurry)
+import Env.Internal.Error (EnvError)
+import Env.Internal.Parser (Parser, VarF(..))
 import Prelude
 
 import Data.Array as Array
 import Data.Foldable (oneOf)
 import Data.FunctorWithIndex (mapWithIndex)
-import Data.Generic.Rep (class Generic)
 import Data.List (List(..), (:))
 import Data.List as List
 import Data.Map (Map)

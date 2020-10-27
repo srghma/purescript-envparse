@@ -1,13 +1,9 @@
 module Env.Internal.Free where
 
-import Control.Alt
-import Control.Alternative.Free
-import Data.Either
-import Data.Generic.Rep
-import Data.Generic.Rep.Show
+import Control.Alternative.Free (FreeAlternative, foldFreeAlternative)
 import Prelude
 
-import Control.Alternative
+import Control.Alternative (class Alt, class Alternative, class Plus)
 import Data.Newtype (class Newtype, unwrap)
 
 foldMonoidFreeAlternative :: forall p f b . Monoid p => (forall a. f a -> p) -> FreeAlternative f b -> p
