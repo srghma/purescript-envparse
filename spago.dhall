@@ -11,6 +11,7 @@
   , "ordered-collections"
   , "strings"
   , "free-alternative"
+  , "node-process"
   ]
 , packages = ./packages.dhall
 , sources = [ "src/**/*.purs", "test/**/*.purs" ]

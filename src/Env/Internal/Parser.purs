@@ -17,27 +17,28 @@ import Data.Newtype (class Newtype, unwrap)
 import Data.Set (Set)
 import Data.Set as Set
 import Data.String.CodeUnits as String
+import Data.String.Common as String
 import Data.String.NonEmpty (NonEmptyString)
 import Data.String.NonEmpty as NonEmptyString
 import Data.String.Pattern (Pattern(..))
 import Data.String.Pattern as String
-import Data.String.Common as String
 import Env.Internal.Error (EnvError)
 import Env.Internal.Error as Error
 import Env.Internal.Val (Val)
 import Env.Internal.Val as Val
+import Foreign.Object (Object)
+import Foreign.Object as Object
 import Unsafe.Coerce (unsafeCoerce)
+import Env.Internal.Free as Free
 
 -- | Try to parse a pure environment
-parsePure :: forall e a . Error.AsUnset e => Parser e a -> Array (Tuple String String) -> Either (Array (Tuple String e)) a
+parsePure :: forall e a . Error.AsUnset e => Parser e a -> Object String -> Either (Array (Tuple String e)) a
 parsePure (Parser p) env =
   Val.toEither (foldFreeAlternative go' p)
   where
-    env' = Map.fromFoldable env
-
     go :: forall a' . VarF e a' -> Either (Tuple String e) a'
     go (VarF varF) =
-      case lookupVar (VarF varF) env' of
+      case lookupVar (VarF varF) env of
         Left lookupErr ->
           maybe (Left lookupErr) Right varF.varfDef
         Right val ->
@@ -51,16 +52,16 @@ traverseSensitiveVar (Parser parser) f =
   traverse_ f sensitiveVars
  where
     sensitiveVars :: Set String
-    sensitiveVars = unsafeCoerce unit
-      -- | foldMap (\(VarF varF) -> if varF.varfSensitive then Set.singleton varF.varfName else Set.empty) parser
+    sensitiveVars =
+      Free.foldMonoidFreeAlternative (\(VarF varF) -> if varF.varfSensitive then Set.singleton varF.varfName else Set.empty) parser
 
 readVar :: forall e a . VarF e a -> String -> Either (Tuple String e) a
 readVar (VarF varF) =
   addName varF.varfName <<< varF.varfReader
 
-lookupVar :: forall e a . Error.AsUnset e => VarF e a -> Map String String -> Either (Tuple String e) String
+lookupVar :: forall e a . Error.AsUnset e => VarF e a -> Object String -> Either (Tuple String e) String
 lookupVar (VarF varF) =
-  addName varF.varfName <<< maybe (Left Error.unset) Right <<< Map.lookup varF.varfName
+  addName varF.varfName <<< maybe (Left Error.unset) Right <<< Object.lookup varF.varfName
 
 addName :: forall e a . String -> Either e a -> Either (Tuple String e) a
 addName name =
