@@ -17,18 +17,18 @@ derive instance eqVal :: (Eq e, Eq a) => Eq (Val e a)
 derive instance genericVal :: Generic (Val e a) _
 instance showVal :: (Show e, Show a) => Show (Val e a) where show x = genericShow x
 
-instance applyVal :: Monoid e => Apply (Val e) where
+instance applyVal :: Semigroup e => Apply (Val e) where
   apply (Err e) (Err e') = Err (e <> e')
   apply (Err e) _        = Err e
   apply _       (Err e') = Err e'
   apply (Ok  f) (Ok  a)  = Ok (f a)
 
-instance applicativeVal :: Monoid e => Applicative (Val e) where
+instance applicativeVal :: Semigroup e => Applicative (Val e) where
   pure = Ok
 
 instance altVal :: Alt (Val e) where
   alt (Err _) r = r
-  alt l        _ = l
+  alt l       _ = l
 
 instance plusVal :: Monoid e => Plus (Val e) where
   empty = Err mempty
@@ -36,8 +36,7 @@ instance plusVal :: Monoid e => Plus (Val e) where
 instance alternativeVal :: Monoid e => Alternative (Val e)
 
 fromEither :: forall e a . Either e a -> Val e a
-fromEither =
-  either Err Ok
+fromEither = either Err Ok
 
 toEither :: forall e a . Val e a -> Either e a
 toEither x =
