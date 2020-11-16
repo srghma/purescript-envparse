@@ -8,6 +8,7 @@ import Data.Array as Array
 import Data.Bifunctor (lmap)
 import Data.Either (Either(..), note)
 import Data.Foldable (traverse_)
+import Data.Int (fromString) as Int
 import Data.Maybe (Maybe(..), maybe)
 import Data.Newtype (class Newtype, unwrap)
 import Data.Set (Set)
@@ -20,8 +21,8 @@ import Data.String.Pattern (Pattern)
 import Data.Tuple (Tuple(..))
 import Env.Internal.Error (EnvError)
 import Env.Internal.Error as Error
-import Env.Internal.Free as Free
 import Env.Internal.Free (Alt)
+import Env.Internal.Free as Free
 import Env.Internal.Val (Val)
 import Env.Internal.Val as Val
 import Foreign.Object (Object)
@@ -169,6 +170,13 @@ nonEmptyString = ReaderT $ NonEmptyString.fromString >>> note Error.empty
 -- | The single character string reader
 char :: forall e . Error.AsUnread e => EnvReader e Char
 char = ReaderT $ \s -> String.toChar s # note (Error.unread "must be a one-character string")
+
+int :: forall e . Error.AsUnread e => EnvReader e Int
+int = ReaderT $ \s -> Int.fromString s # note (Error.unread "must be an integer")
+
+-- TODO
+-- | number :: forall e . Error.AsUnread e => EnvReader e Number
+-- | number = ReaderT $ \s -> Number.fromString s # note (Error.unread "must be a number")
 
 -- | The reader that splits a string into a list of strings consuming the separator.
 split :: forall e . Pattern -> EnvReader e (Array String)
