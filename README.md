@@ -1,6 +1,8 @@
 # purescript-envparse
 
-port of https://github.com/supki/envparse
+port of https://github.com/supki/envparse with some differences
+
+depends on https://github.com/purescript-node/purescript-node-process/pull/21
 
 Example
 
@@ -56,6 +58,10 @@ Parsing errors:
 $ NAME="myname" QUIET="" OPTIONAL_FOO="asdf" ./.spago/run.js
 envConfig: { name: "myname", optionalFoo: (Just (NonEmptyString.unsafeFromString "asdf")), quiet: false }
 ```
+
+# TODOs
+
+- the handling of optional (Maybe) vars is not pretty
 
 # Alternatives
 
