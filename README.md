@@ -56,3 +56,8 @@ Parsing errors:
 $ NAME="myname" QUIET="" OPTIONAL_FOO="asdf" ./.spago/run.js
 envConfig: { name: "myname", optionalFoo: (Just (NonEmptyString.unsafeFromString "asdf")), quiet: false }
 ```
+
+# Alternatives
+
+- https://github.com/purescript-polyform/batteries-env
+- https://github.com/nsaunders/purescript-typedenv
