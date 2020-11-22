@@ -19,7 +19,6 @@ import Data.String.NonEmpty (NonEmptyString)
 import Data.String.NonEmpty as NonEmptyString
 import Data.String.Pattern (Pattern)
 import Data.Tuple (Tuple(..))
-import Env.Internal.Error (EnvError)
 import Env.Internal.Error as Error
 import Env.Internal.Free (Alt)
 import Env.Internal.Free as Free
@@ -114,50 +113,75 @@ liftVarF =
 type EnvReader e a = ReaderT String (Either e) a
 
 -- | Parse a particular variable from the environment
---
--- @
--- >>> var 'str' \"EDITOR\" ('def' \"vim\" <> 'helpDef' show)
--- @
-var :: forall e a . Error.AsUnset e => EnvReader e a -> String -> Var a -> Parser e a
+var
+  :: forall e a
+   . Error.AsUnset e
+  => EnvReader e a
+  -> String
+  -> { help      :: Maybe String
+     , helpDef   :: Maybe String
+     , def       :: Maybe a
+     , sensitive :: Boolean
+     }
+  -> Parser e a
 var reader name varConfig =
   liftVarF $ VarF
     { name
     , reader
     , help: varConfig.help
     , def: varConfig.def
-    , helpDef: varConfig.helpDef <*> varConfig.def
+    , helpDef: varConfig.helpDef
     , sensitive: varConfig.sensitive
     }
 
--- | A flag that takes the active value if the environment variable
--- is set and non-empty and the default value otherwise
---
--- /Note:/ this parser never fails.
-flag
+-- | Parse a particular variable from the environment
+varOptional
   :: forall e a
-   . Show a
-  => a -- ^ default value
-  -> a -- ^ active value
-  -> String -> Flag a -> Parser e a
-flag f t n flagConfig =
+   . Error.AsUnset e
+  => EnvReader e a
+  -> String
+  -> { help      :: Maybe String
+     , sensitive :: Boolean
+     }
+  -> Parser e (Maybe a)
+varOptional reader name varConfig =
   liftVarF $ VarF
-    { name: n
-    , reader: ReaderT \val ->
-        pure $ case runReaderT (nonEmptyString :: EnvReader EnvError NonEmptyString) val of
-          Left  _ -> f
-          Right _ -> t
-    , help: flagConfig.help
-    , def: Just f
-    , helpDef: Just (show f)
-    , sensitive: flagConfig.sensitive
+    { name
+    , reader: reader <#> Just
+    , help: varConfig.help
+    , def: Just Nothing
+    , helpDef: Just "Nothing"
+    , sensitive: varConfig.sensitive
     }
 
 -- | A simple boolean 'flag'
+-- |
+-- | "1" -> true
+-- | "true" -> true
+-- | _ -> false
+-- | unset -> false
 --
 -- /Note:/ this parser never fails.
-switch :: forall e . String -> Flag Boolean -> Parser e Boolean
-switch =
-  flag false true
+switch
+  :: forall e
+   . String
+  -> { help :: Maybe String
+     , sensitive :: Boolean
+     }
+  -> Parser e Boolean
+switch name config =
+  liftVarF $ VarF
+    { name
+    , reader: ReaderT $ Right <<<
+      case _ of
+           "1"    -> true
+           "true" -> true
+           _      -> false
+    , help: config.help
+    , def: Just false
+    , helpDef: Just "false"
+    , sensitive: config.sensitive
+    }
 
 -- | The trivial reader
 str :: forall e . EnvReader e String
@@ -181,34 +205,3 @@ int = ReaderT $ \s -> Int.fromString s # note (Error.unread "must be an integer"
 -- | The reader that splits a string into a list of strings consuming the separator.
 split :: forall e . Pattern -> EnvReader e (Array String)
 split sep = ReaderT $ Right <<< String.split sep
-
--- | Environment variable metadata
-type Var a =
-  { help      :: Maybe String
-  , helpDef   :: Maybe (a -> String)
-  , def       :: Maybe a
-  , sensitive :: Boolean
-  }
-
-defaultVar :: forall a . Var a
-defaultVar =
-  { help: Nothing
-  , def: Nothing
-  , helpDef: Nothing
-  , sensitive: defaultSensitive
-  }
-
-defaultSensitive :: Boolean
-defaultSensitive = false
-
--- | Flag metadata
-type Flag a =
-  { help      :: Maybe String
-  , sensitive :: Boolean
-  }
-
-defaultFlag :: forall a . Flag a
-defaultFlag =
-  { help: Nothing
-  , sensitive: defaultSensitive
-  }
