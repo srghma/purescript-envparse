@@ -5,8 +5,7 @@ import Effect (Effect)
 import Effect.Console (log)
 import Env (EnvReader)
 import Env as Env
-import Data.Maybe
-import Data.String.NonEmpty (NonEmptyString)
+import Data.Maybe (Maybe(..))
 import Data.String.NonEmpty as NonEmptyString
 
 type EnvConfig =
