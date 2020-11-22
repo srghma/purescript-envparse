@@ -13,7 +13,8 @@
   , "node-process"
   , "transformers"
   , "exists"
-  , "dodo-printer"
+  , "boxes"
+  , "ansi"
   ]
 , packages = ./packages.dhall
 , sources = [ "src/**/*.purs", "test/**/*.purs" ]
