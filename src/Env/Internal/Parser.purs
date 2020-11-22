@@ -36,7 +36,9 @@ parsePure (Parser p) env =
     go (VarF varF) =
       case lookupVar (VarF varF) env of
         Left lookupErr ->
-          maybe (Left lookupErr) Right varF.def
+          case varF.default of
+               Nothing -> Left lookupErr
+               Just { value } -> Right value
         Right val ->
           readVar (VarF varF) val
 
@@ -94,12 +96,13 @@ sensitive :: forall e a . Parser e a -> Parser e a
 sensitive =
   Parser <<< Free.hoistAlt (\(VarF varF) -> VarF (varF { sensitive = true })) <<< unwrap
 
+type DefaultVar a = { value :: a, help :: Maybe String }
+
 newtype VarF e a = VarF
   { name      :: String
   , reader    :: EnvReader e a
   , help      :: Maybe String
-  , def       :: Maybe a
-  , helpDef   :: Maybe String
+  , default   :: Maybe (DefaultVar a)
   , sensitive :: Boolean
   }
 
@@ -112,6 +115,9 @@ liftVarF =
 -- | An environment variable's value parser. Use @(<=<)@ and @(>=>)@ to combine these
 type EnvReader e a = ReaderT String (Either e) a
 
+defaultVar :: forall a . Show a => a -> DefaultVar a
+defaultVar value = { value, help: Just (show value) }
+
 -- | Parse a particular variable from the environment
 var
   :: forall e a
@@ -119,8 +125,7 @@ var
   => EnvReader e a
   -> String
   -> { help      :: Maybe String
-     , helpDef   :: Maybe String
-     , def       :: Maybe a
+     , default   :: Maybe (DefaultVar a)
      , sensitive :: Boolean
      }
   -> Parser e a
@@ -129,8 +134,7 @@ var reader name varConfig =
     { name
     , reader
     , help: varConfig.help
-    , def: varConfig.def
-    , helpDef: varConfig.helpDef
+    , default: varConfig.default
     , sensitive: varConfig.sensitive
     }
 
@@ -149,8 +153,7 @@ varOptional reader name varConfig =
     { name
     , reader: reader <#> Just
     , help: varConfig.help
-    , def: Just Nothing
-    , helpDef: Just "Nothing"
+    , default: Just { value: Nothing, help: Just "Nothing" }
     , sensitive: varConfig.sensitive
     }
 
@@ -178,8 +181,7 @@ switch name config =
            "true" -> true
            _      -> false
     , help: config.help
-    , def: Just false
-    , helpDef: Just "false"
+    , default: Just (defaultVar false)
     , sensitive: config.sensitive
     }
 

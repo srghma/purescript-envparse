@@ -16,8 +16,8 @@ import Env.Internal.Help as Help
 import Node.Process as NodeProcess
 
 import Env.Internal.Error (class AsEmpty, class AsUnread, class AsUnset, EnvError(..), empty, tryEmpty, tryUnread, tryUnset, unread, unset) as Export
-import Env.Internal.Parser (EnvReader, Parser(..), VarF(..), addName, char, int, liftVarF, lookupVar, nonEmptyString, parsePure, prefixed, readVar, sensitive, split, str, switch, traverseSensitiveVar, var, varOptional) as Export
-import Env.Internal.Help (ErrorHandler, Info, defaultErrorHandler, defaultInfo, handleEmptyError, handleUnreadError, handleUnsetError, helpDoc, helpErrors, helpInfo, helpParserDoc, helpVarfDoc, indent, splitWords, varName) as Export
+import Env.Internal.Parser (DefaultVar, EnvReader, Parser(..), VarF(..), addName, char, defaultVar, int, liftVarF, lookupVar, nonEmptyString, parsePure, prefixed, readVar, sensitive, split, str, switch, traverseSensitiveVar, var, varOptional) as Export
+import Env.Internal.Help (ErrorHandler, Info, defaultErrorHandler, defaultInfo, handleEmptyError, handleUnreadError, handleUnsetError, helpErrors, helpInfo, helpParserDoc, helpVarfDoc, indent, splitWords) as Export
 
 parse :: forall e a . Error.AsUnset e => Help.Info e -> Parser e a -> Effect a
 parse m =

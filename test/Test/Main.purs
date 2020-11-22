@@ -26,8 +26,7 @@ envConfig = Env.parse (Env.defaultInfo { header = Just "Envparse example" }) ado
   name <- Env.var nonempty "NAME"
     { help: Just "NAME help"
     , sensitive: true
-    , def: Nothing
-    , helpDef: Nothing
+    , default: Nothing
     }
 
   -- unset -> "world"
@@ -36,8 +35,7 @@ envConfig = Env.parse (Env.defaultInfo { header = Just "Envparse example" }) ado
   nameOrWorldOnUnset <- Env.var nonempty "NAME_OR_WORLD_ON_UNSET"
     { help: Just "NAME_OR_WORLD_ON_UNSET help"
     , sensitive: true
-    , def: Just "world"
-    , helpDef: Nothing
+    , default: Just $ Env.defaultVar "world"
     }
 
   -- "1" -> true

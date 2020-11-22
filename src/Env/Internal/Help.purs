@@ -1,7 +1,7 @@
 module Env.Internal.Help where
 
-import Data.Maybe (Maybe(..), maybe)
-import Data.Tuple (Tuple, fst, uncurry)
+import Data.Maybe (Maybe(..))
+import Data.Tuple (Tuple(..), uncurry)
 import Env.Internal.Error (EnvError)
 import Env.Internal.Parser (Parser, VarF(..))
 import Prelude
@@ -24,14 +24,9 @@ helpInfo info p errors =
   String.joinWith "\n\n" $ Array.catMaybes
     [ info.header
     , map (String.joinWith "\n" <<< splitWords 50) info.desc
-    , Just (helpDoc p)
+    , Just $ String.joinWith "\n" $ Array.cons "Available environment variables:\n" (helpParserDoc p)
     , map (String.joinWith "\n" <<< splitWords 50) info.footer
     ] <> helpErrors info.handleError errors
-
--- | A pretty-printed list of recognized environment variables suitable for usage messages
-helpDoc :: forall e a . Parser e a -> String
-helpDoc p =
-  String.joinWith "\n" $ Array.cons "Available environment variables:\n" (helpParserDoc p)
 
 helpParserDoc :: forall e a . Parser e a -> Array String
 helpParserDoc =
@@ -46,7 +41,13 @@ helpVarfDoc (VarF varF) =
     Nothing -> [indent 2 varF.name]
     Just h ->
       let
-          t = maybe h (\s -> h <> " (default: " <> s <>")") varF.helpDef
+          t =
+            case varF.default of
+                 Nothing -> h
+                 Just { help } ->
+                   case help of
+                        Nothing -> h
+                        Just s -> h <> " (default: " <> s <>")"
       in
         case unit of
           _ | k > 15    -> Array.cons (indent 2 varF.name) (map (indent 25) (splitWords 30 t))
@@ -94,7 +95,7 @@ helpErrors :: forall e . ErrorHandler e -> Array (Tuple String e) -> Array Strin
 helpErrors _       [] = []
 helpErrors handler fs =
   [ "Parsing errors:"
-  , String.joinWith "\n" (Array.mapMaybe (uncurry handler) (Array.sortBy (comparing varName) fs))
+  , String.joinWith "\n" (Array.mapMaybe (uncurry handler) (Array.sortBy (comparing (\(Tuple varName _) -> varName)) fs))
   ]
 
 -- | Parser's metadata
@@ -132,6 +133,3 @@ handleEmptyError name =
 handleUnreadError :: forall e . Error.AsUnread e => ErrorHandler e
 handleUnreadError name =
   map (\val -> indent 2 (name <> " has value " <> val <> " that cannot be parsed")) <<< Error.tryUnread
-
-varName :: forall e . Tuple String e -> String
-varName = fst
