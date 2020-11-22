@@ -46,7 +46,7 @@ Parsing errors:
 
 # TODOs
 
-- the handling of optional (Maybe) vars is not pretty
+- [x] the handling of optional (Maybe) vars is not pretty
 
 # Alternatives
 
