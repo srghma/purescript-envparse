@@ -77,6 +77,16 @@ helpParserDoc =
       , helps: Nil
       , defaultValueHelps: Nil
       }
+  -- | Boxes.moveRight 2
+  -- | <<< Boxes.vcat Boxes.left
+  -- | <<< map
+  -- | (\config ->
+  -- |   Boxes.hsep 1 Boxes.left
+  -- |   [ Boxes.para Boxes.left 80 $ styleName config.name
+  -- |   , maybe Boxes.nullBox (Boxes.para Boxes.left 40) config.help
+  -- |   , maybe Boxes.nullBox (Boxes.para Boxes.left 40) config.defaultValueHelp
+  -- |   ]
+  -- | )
   <<< Map.values
   <<< Free.foldAlt collectInfoUniq
   <<< unwrap
@@ -147,5 +157,8 @@ handleUnreadError :: forall e . Error.AsUnread e => ErrorHandler e
 handleUnreadError name =
   map (\val -> styleName name <> " has value " <> styleVal val <> " that cannot be parsed") <<< Error.tryUnread
 
-styleName = (Ansi.withGraphics (Ansi.bold <> Ansi.foreground Ansi.Red))
-styleVal = (Ansi.withGraphics (Ansi.bold <> Ansi.foreground Ansi.Green))
+styleName :: String → String
+styleName = Ansi.withGraphics (Ansi.bold <> Ansi.foreground Ansi.Red)
+
+styleVal :: String → String
+styleVal = Ansi.withGraphics (Ansi.bold <> Ansi.foreground Ansi.Green)
