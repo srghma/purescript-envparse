@@ -213,6 +213,9 @@ switch name config =
     , sensitive: config.sensitive
     }
 
+nonempty :: forall e . Error.AsEmpty e => EnvReader e String
+nonempty = nonEmptyString <#> NonEmptyString.toString
+
 -- | The trivial reader
 str :: forall e . EnvReader e String
 str = ReaderT Right

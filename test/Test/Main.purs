@@ -15,9 +15,6 @@ type EnvConfig =
   , optionalFoo :: Maybe String
   }
 
-nonempty :: forall e . Env.AsEmpty e => EnvReader e String
-nonempty = Env.nonEmptyString <#> NonEmptyString.toString
-
 envConfig :: Effect EnvConfig
 envConfig = Env.parse
   { header:        Just "ENVPARSE EXAMPLE header"
@@ -29,7 +26,7 @@ envConfig = Env.parse
     -- unset -> UnsetError
     -- "" -> EmptyError
     -- x -> x
-    name <- Env.var nonempty "NAME" $ Env.defaultVarOptions
+    name <- Env.var Env.nonempty "NAME" $ Env.defaultVarOptions
       { help      = Just "NAME help"
       , sensitive = true
       }
@@ -37,7 +34,7 @@ envConfig = Env.parse
     -- unset -> "world"
     -- "" -> EmptyError
     -- x -> x
-    nameOrWorldOnUnset <- Env.var nonempty "NAME_OR_WORLD_ON_UNSET"
+    nameOrWorldOnUnset <- Env.var Env.nonempty "NAME_OR_WORLD_ON_UNSET"
       { help: Just "NAME_OR_WORLD_ON_UNSET help"
       , sensitive: true
       , default: Just $ Env.defaultVar "world"
@@ -56,7 +53,7 @@ envConfig = Env.parse
     -- "" -> EmptyError
     -- x -> Just x
     optionalFoo <- Env.optionalVar
-      nonempty
+      Env.nonempty
       "OPTIONAL_FOO"
       { help: Just "OPTIONAL_FOO help"
       , sensitive: false
