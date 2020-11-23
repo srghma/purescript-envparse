@@ -17,7 +17,7 @@ import Node.Process as NodeProcess
 import Text.PrettyPrint.Boxes as Boxes
 
 import Env.Internal.Error (class AsEmpty, class AsUnread, class AsUnset, EnvError(..), empty, tryEmpty, tryUnread, tryUnset, unread, unset) as Export
-import Env.Internal.Parser (DefaultVar, EnvReader, OptionalVarOptions, Parser(..), SwitchOptions, VarF(..), VarOptions, addName, char, defaultOptionalVarOptions, defaultSwitchOptions, defaultVar, defaultVarOptions, int, liftVarF, lookupVar, nonEmptyString, optionalVar, parsePure, prefixed, readVar, sensitive, split, str, switch, traverseSensitiveVar, var) as Export
+import Env.Internal.Parser (DefaultVar, EnvReader, OptionalVarOptions, Parser(..), SwitchOptions, VarF(..), VarOptions, addName, char, defaultOptionalVarOptions, defaultSwitchOptions, defaultVar, defaultVarOptions, int, liftVarF, lookupVar, nonEmptyString, optionalVar, parsePure, prefixed, readVar, sensitive, split, str, switch, traverseSensitiveVar, var, nonempty) as Export
 import Env.Internal.Help (ErrorHandler, HelpParserDocInfo, HelpParserDocInfo', Info, defaultErrorHandler, defaultInfo, handleEmptyError, handleUnreadError, handleUnsetError, helpInfo, helpParserDoc, styleName, styleVal) as Export
 
 parse :: forall e a . Error.AsUnset e => Help.Info e -> Parser e a -> Effect a

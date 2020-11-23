@@ -3,10 +3,8 @@ module Test.Main where
 import Prelude
 import Effect (Effect)
 import Effect.Console (log)
-import Env (EnvReader)
 import Env as Env
 import Data.Maybe (Maybe(..))
-import Data.String.NonEmpty as NonEmptyString
 
 type EnvConfig =
   { name :: String
