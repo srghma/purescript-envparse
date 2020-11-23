@@ -5,25 +5,20 @@ import Prelude
 import Data.Array (foldr)
 import Data.Array as Array
 import Data.Foldable (oneOf)
-import Data.FunctorWithIndex (mapWithIndex)
-import Data.List (List(..), (:))
-import Data.List as List
+import Data.List (List(..))
 import Data.Map (Map)
 import Data.Map as Map
 import Data.Maybe (Maybe(..), maybe)
 import Data.Newtype (unwrap)
-import Data.String as String
-import Data.String.Pattern (Pattern(..))
-import Data.Tuple (Tuple(..), uncurry)
+import Data.Tuple (Tuple(..))
 import Env.Internal.Error (EnvError)
 import Env.Internal.Error as Error
 import Env.Internal.Free as Free
 import Env.Internal.Parser (Parser, VarF(..))
 import Text.PrettyPrint.Boxes (Box)
 import Text.PrettyPrint.Boxes as Boxes
-import Unsafe.Coerce (unsafeCoerce)
-import Ansi.Codes as Ansi
-import Ansi.Output as Ansi
+import Ansi.Codes (Color(..)) as Ansi
+import Ansi.Output (bold, foreground, withGraphics) as Ansi
 
 helpInfo :: forall e a . Info e -> Parser e a -> Array (Tuple String e) -> Box
 helpInfo = \info parser errors ->
