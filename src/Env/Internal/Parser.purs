@@ -118,16 +118,26 @@ type EnvReader e a = ReaderT String (Either e) a
 defaultVar :: forall a . Show a => a -> DefaultVar a
 defaultVar value = { value, help: Just (show value) }
 
+type VarOptions a =
+  { help      :: Maybe String
+  , default   :: Maybe (DefaultVar a)
+  , sensitive :: Boolean
+  }
+
+defaultVarOptions :: forall a . VarOptions a
+defaultVarOptions =
+  { help:      Nothing
+  , default:   Nothing
+  , sensitive: false
+  }
+
 -- | Parse a particular variable from the environment
 var
   :: forall e a
    . Error.AsUnset e
   => EnvReader e a
   -> String
-  -> { help      :: Maybe String
-     , default   :: Maybe (DefaultVar a)
-     , sensitive :: Boolean
-     }
+  -> VarOptions a
   -> Parser e a
 var reader name varConfig =
   liftVarF $ VarF
@@ -138,17 +148,26 @@ var reader name varConfig =
     , sensitive: varConfig.sensitive
     }
 
+type OptionalVarOptions =
+  { help      :: Maybe String
+  , sensitive :: Boolean
+  }
+
+defaultOptionalVarOptions :: OptionalVarOptions
+defaultOptionalVarOptions =
+  { help:      Nothing
+  , sensitive: false
+  }
+
 -- | Parse a particular variable from the environment
-varOptional
+optionalVar
   :: forall e a
    . Error.AsUnset e
   => EnvReader e a
   -> String
-  -> { help      :: Maybe String
-     , sensitive :: Boolean
-     }
+  -> OptionalVarOptions
   -> Parser e (Maybe a)
-varOptional reader name varConfig =
+optionalVar reader name varConfig =
   liftVarF $ VarF
     { name
     , reader: reader <#> Just
@@ -156,6 +175,17 @@ varOptional reader name varConfig =
     , default: Just { value: Nothing, help: Just "Nothing" }
     , sensitive: varConfig.sensitive
     }
+
+type SwitchOptions =
+  { help      :: Maybe String
+  , sensitive :: Boolean
+  }
+
+defaultSwitchOptions :: SwitchOptions
+defaultSwitchOptions =
+  { help:      Nothing
+  , sensitive: false
+  }
 
 -- | A simple boolean 'flag'
 -- |
@@ -168,9 +198,7 @@ varOptional reader name varConfig =
 switch
   :: forall e
    . String
-  -> { help :: Maybe String
-     , sensitive :: Boolean
-     }
+  -> SwitchOptions
   -> Parser e Boolean
 switch name config =
   liftVarF $ VarF

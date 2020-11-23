@@ -29,10 +29,9 @@ envConfig = Env.parse
     -- unset -> UnsetError
     -- "" -> EmptyError
     -- x -> x
-    name <- Env.var nonempty "NAME"
-      { help:      Just "NAME help"
-      , sensitive: true
-      , default:   Nothing
+    name <- Env.var nonempty "NAME" $ Env.defaultVarOptions
+      { help      = Just "NAME help"
+      , sensitive = true
       }
 
     -- unset -> "world"
@@ -56,7 +55,7 @@ envConfig = Env.parse
     -- unset -> Nothing
     -- "" -> EmptyError
     -- x -> Just x
-    optionalFoo <- Env.varOptional
+    optionalFoo <- Env.optionalVar
       nonempty
       "OPTIONAL_FOO"
       { help: Just "OPTIONAL_FOO help"
