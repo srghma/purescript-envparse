@@ -2,7 +2,7 @@ module Env.Internal.Val where
 
 import Data.Either (Either(..), either)
 import Data.Generic.Rep (class Generic)
-import Data.Generic.Rep.Show (genericShow)
+import Data.Show.Generic (genericShow)
 import Prelude
 
 import Control.Alternative (class Alt, class Alternative, class Plus)
