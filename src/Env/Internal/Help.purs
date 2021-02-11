@@ -2,11 +2,10 @@ module Env.Internal.Help where
 
 import Prelude
 
-import Data.Array (foldr)
 import Data.Array as Array
-import Data.Foldable (oneOf)
+import Data.Foldable (oneOf, foldr)
 import Data.List (List(..))
-import Data.Map (Map)
+import Data.Map (SemigroupMap(..))
 import Data.Map as Map
 import Data.Maybe (Maybe(..), maybe)
 import Data.Newtype (unwrap)
@@ -83,6 +82,7 @@ helpParserDoc =
   -- |   ]
   -- | )
   <<< Map.values
+  <<< unwrap
   <<< Free.foldAlt collectInfoUniq
   <<< unwrap
   where
@@ -102,8 +102,8 @@ helpParserDoc =
     collectInfoUniq
       :: forall a'
        . VarF e a'
-      -> Map String HelpParserDocInfo
-    collectInfoUniq (VarF v) = Map.singleton v.name (collectInfo (VarF v))
+      -> SemigroupMap String HelpParserDocInfo
+    collectInfoUniq (VarF v) = SemigroupMap $ Map.singleton v.name (collectInfo (VarF v))
 
     collectInfos :: HelpParserDocInfo -> HelpParserDocInfo' -> HelpParserDocInfo'
     collectInfos info infoAcc =

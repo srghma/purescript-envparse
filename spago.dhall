@@ -6,7 +6,6 @@
   , "nullable"
   , "functions"
   , "either"
-  , "generics-rep"
   , "lists"
   , "ordered-collections"
   , "strings"
