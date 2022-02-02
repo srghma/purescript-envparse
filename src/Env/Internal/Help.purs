@@ -32,7 +32,7 @@ helpInfo = \info parser errors ->
     , helpErrors info.handleError errors
     ]
   where
-    helpErrors :: forall e . ErrorHandler e -> Array (Tuple String e) -> Maybe Box
+    helpErrors :: ErrorHandler e -> Array (Tuple String e) -> Maybe Box
     helpErrors _       [] = Nothing
     helpErrors handler fs =
       Just $
@@ -87,8 +87,8 @@ helpParserDoc =
   <<< unwrap
   where
     collectInfo
-      :: forall e a
-       . VarF e a
+      :: forall e' a'
+       . VarF e' a'
       -> HelpParserDocInfo
     collectInfo (VarF varF) =
       { name: varF.name
