@@ -15,6 +15,6 @@ in upstream
       , "strings"
       , "tuples"
       ]
-    , repo = "https://github.com/srghma/purescript-boxes"
+    , repo = "https://github.com/cdepillabout/purescript-boxes.git"
     , version = "master"
     }
