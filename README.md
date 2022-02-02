@@ -1,5 +1,7 @@
 # purescript-envparse
 
+![2022-02-02-11am-20-48-screenshot](https://user-images.githubusercontent.com/7573215/152129507-4a20dd26-3ae3-4c55-bfc4-3b383be305cd.png)
+
 port of https://github.com/supki/envparse with some differences
 
 depends on https://github.com/purescript-node/purescript-node-process/pull/21
