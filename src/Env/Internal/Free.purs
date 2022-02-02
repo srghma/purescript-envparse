@@ -77,6 +77,7 @@ hoistAlt nat =
   runAlt (Lift <<< nat)
 
 -- | The 'Alt' functor induced by the 'Monoid'
+newtype Mon :: forall k. Type -> k -> Type
 newtype Mon m a = Mon m
 
 derive instance newtypeParser :: Newtype (Mon m a) _
