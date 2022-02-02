@@ -14,36 +14,31 @@ import Env.Internal.Error (EnvError)
 import Env.Internal.Error as Error
 import Env.Internal.Free as Free
 import Env.Internal.Parser (Parser, VarF(..))
-import Text.PrettyPrint.Boxes (Box)
-import Text.PrettyPrint.Boxes as Boxes
+import Dodo (Doc, (<%>))
+import Dodo as Dodo
 import Ansi.Codes (Color(..)) as Ansi
 import Ansi.Output (bold, foreground, withGraphics) as Ansi
 
-helpInfo :: forall e a . Info e -> Parser e a -> Array (Tuple String e) -> Box
-helpInfo = \info parser errors ->
-  Boxes.punctuateV Boxes.left (Boxes.emptyBox 1 0) $ Array.catMaybes
-    [ map (Boxes.para Boxes.left 80) info.header
-    , map (Boxes.para Boxes.left 80) info.description
-    , Just $
-        (Boxes.text "Available environment variables:")
-        Boxes.//
-        (helpParserDoc parser)
-    , map (Boxes.para Boxes.left 80) info.footer
-    , helpErrors info.handleError errors
-    ]
+helpInfo :: forall e a . Info e -> Parser e a -> Array (Tuple String e) -> Doc Void
+helpInfo info parser errors = Dodo.foldWithSeparator (Dodo.break <> Dodo.break) $ Array.catMaybes
+  [ map Dodo.textParagraph info.header
+  , map Dodo.textParagraph info.description
+  , Just $
+      Dodo.text "Available environment variables:" <%>
+      helpParserDoc parser
+  , map Dodo.textParagraph info.footer
+  , helpErrors info.handleError errors
+  ]
   where
-    helpErrors :: forall e . ErrorHandler e -> Array (Tuple String e) -> Maybe Box
+    helpErrors :: ErrorHandler e -> Array (Tuple String e) -> Maybe (Doc Void)
     helpErrors _       [] = Nothing
     helpErrors handler fs =
-      Just $
-        (Boxes.text "Parsing errors:")
-        Boxes.//
-        ( Boxes.moveRight 2
-        $ Boxes.hcat Boxes.left
-        $ Array.mapMaybe (\(Tuple name error) -> map (Boxes.para Boxes.left 80)
-        $ handler name error)
-        $ Array.sortBy (comparing (\(Tuple varName _) -> varName)) fs
-        )
+      Just $ Dodo.text "Parsing errors:" <%>
+          ( Dodo.indent
+          $ Dodo.foldWithSeparator Dodo.break
+          $ Array.mapMaybe (\(Tuple name error) -> map Dodo.textParagraph (handler name error))
+          $ Array.sortBy (comparing (\(Tuple varName _) -> varName)) fs
+          )
 
 type HelpParserDocInfo =
   { name :: String
@@ -51,36 +46,16 @@ type HelpParserDocInfo =
   , defaultValueHelp :: Maybe String
   }
 
-type HelpParserDocInfo' =
-  { names             :: List String
-  , helps             :: List (Maybe String)
-  , defaultValueHelps :: List (Maybe String)
-  }
-
-helpParserDoc :: forall e a . Parser e a -> Box
+helpParserDoc :: forall e a . Parser e a -> Doc Void
 helpParserDoc =
-  (\config ->
-    Boxes.moveRight 2 $ Boxes.hsep 1 Boxes.left
-    [ Boxes.vcat Boxes.left $ map (Boxes.para Boxes.left 80 <<< styleName) config.names
-    , Boxes.vcat Boxes.left $ map (maybe Boxes.nullBox (Boxes.para Boxes.left 40)) config.helps
-    , Boxes.vcat Boxes.left $ map (maybe Boxes.nullBox (Boxes.para Boxes.left 40)) config.defaultValueHelps
+  ?a
+  <<< map (\config ->
+    Dodo.indent $ Dodo.flexGroup $ Dodo.paragraph $ Array.catMaybes
+    [ Maybe (Dodo.textParagraph <<< styleName) config.name
+    , map (Dodo.textParagraph) config.help
+    , map (Dodo.textParagraph) config.defaultValueHelp
     ]
   )
-  <<< foldr collectInfos
-      { names: Nil
-      , helps: Nil
-      , defaultValueHelps: Nil
-      }
-  -- | Boxes.moveRight 2
-  -- | <<< Boxes.vcat Boxes.left
-  -- | <<< map
-  -- | (\config ->
-  -- |   Boxes.hsep 1 Boxes.left
-  -- |   [ Boxes.para Boxes.left 80 $ styleName config.name
-  -- |   , maybe Boxes.nullBox (Boxes.para Boxes.left 40) config.help
-  -- |   , maybe Boxes.nullBox (Boxes.para Boxes.left 40) config.defaultValueHelp
-  -- |   ]
-  -- | )
   <<< Map.values
   <<< unwrap
   <<< Free.foldAlt collectInfoUniq
@@ -104,13 +79,6 @@ helpParserDoc =
        . VarF e a'
       -> SemigroupMap String HelpParserDocInfo
     collectInfoUniq (VarF v) = SemigroupMap $ Map.singleton v.name (collectInfo (VarF v))
-
-    collectInfos :: HelpParserDocInfo -> HelpParserDocInfo' -> HelpParserDocInfo'
-    collectInfos info infoAcc =
-      { names:             Cons info.name infoAcc.names
-      , helps:             Cons info.help infoAcc.helps
-      , defaultValueHelps: Cons info.defaultValueHelp infoAcc.defaultValueHelps
-      }
 
 -- | Parser's metadata
 type Info e =
@@ -153,7 +121,7 @@ handleUnreadError name =
   map (\val -> styleName name <> " has value " <> styleVal val <> " that cannot be parsed") <<< Error.tryUnread
 
 styleName :: String → String
-styleName = Ansi.withGraphics (Ansi.bold <> Ansi.foreground Ansi.Red)
+styleName = identity -- Ansi.withGraphics (Ansi.bold <> Ansi.foreground Ansi.Red)
 
 styleVal :: String → String
-styleVal = Ansi.withGraphics (Ansi.bold <> Ansi.foreground Ansi.Green)
+styleVal = identity -- Ansi.withGraphics (Ansi.bold <> Ansi.foreground Ansi.Green)

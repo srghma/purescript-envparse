@@ -14,7 +14,7 @@ import Effect.Console (error) as Console
 import Env.Internal.Error as Error
 import Env.Internal.Help as Help
 import Node.Process as NodeProcess
-import Text.PrettyPrint.Boxes as Boxes
+import Dodo as Dodo
 
 import Env.Internal.Error (class AsEmpty, class AsUnread, class AsUnset, EnvError(..), empty, tryEmpty, tryUnread, tryUnset, unread, unset) as Export
 import Env.Internal.Parser (DefaultVar, EnvReader, OptionalVarOptions, Parser(..), SwitchOptions, VarF(..), VarOptions, addName, char, defaultOptionalVarOptions, defaultSwitchOptions, defaultVar, defaultVarOptions, int, liftVarF, lookupVar, nonEmptyString, optionalVar, parsePure, prefixed, readVar, sensitive, split, str, switch, traverseSensitiveVar, var, nonempty) as Export
@@ -32,7 +32,7 @@ parseOr onFailure info parser = do
   b <- map (parsePure parser) NodeProcess.getEnv
   for_ b $ \_ ->
     traverseSensitiveVar parser NodeProcess.unsetEnv
-  traverseLeft (onFailure <<< Boxes.render <<< Help.helpInfo info parser) b
+  traverseLeft (onFailure <<< Dodo.print Dodo.plainText Dodo.twoSpaces <<< Help.helpInfo info parser) b
 
 die :: forall a . String -> Effect a
 die m = do
